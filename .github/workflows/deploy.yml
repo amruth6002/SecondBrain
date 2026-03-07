@@ -1,4 +1,4 @@
-name: Build and Push Docker Image
+name: Build, Push & Deploy
 
 on:
   push:
@@ -37,3 +37,13 @@ jobs:
             ghcr.io/amruth6002/secondbrain:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Ping Azure webhook to trigger a pull of the new image
+      - name: Trigger Azure deployment
+        if: env.AZURE_WEBAPP_WEBHOOK != ''
+        env:
+          AZURE_WEBAPP_WEBHOOK: ${{ secrets.AZURE_WEBAPP_WEBHOOK }}
+        run: |
+          curl -s -X POST "$AZURE_WEBAPP_WEBHOOK" \
+            -H "Content-Length: 0" \
+            --max-time 30 || echo "Webhook ping sent (response may be delayed)"
