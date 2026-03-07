@@ -12,6 +12,7 @@ import {
   processYouTube,
   subscribePipelineStatus,
   getDashboardStats,
+  getLatestResults,
   getSessions,
   getSession,
   deleteSession,
@@ -111,37 +112,40 @@ export default function App() {
     setView("pipeline");
     setPipelineStatus({ stage: "planner", progress: 5, message: "Starting..." });
 
-    subscribePipelineStatus((status) => {
-      setPipelineStatus(status);
-    });
-
     try {
-      let res;
-      if (type === "text") res = await processText(data);
-      else if (type === "pdf") res = await processPDF(data);
-      else if (type === "youtube") res = await processYouTube(data);
-
-      setResult(res);
-
-      try {
-        const s = await getDashboardStats();
-        setStats(s);
-      } catch (err) {
-        console.warn("Silent fallback: Failed to refresh dashboard stats after processing", err);
-      }
-
-      await refreshSessions();
-      setView("results");
+      // Fire the pipeline (returns immediately; backend runs it in the background)
+      if (type === "text") await processText(data);
+      else if (type === "pdf") await processPDF(data);
+      else if (type === "youtube") await processYouTube(data);
     } catch (e) {
-      setError(e.message || "Processing failed");
-      setPipelineStatus({
-        stage: "error",
-        progress: 0,
-        message: "Processing failed: " + (e.message || "Unknown error"),
-      });
-    } finally {
+      setError(e.message || "Failed to start processing");
+      setPipelineStatus({ stage: "error", progress: 0, message: e.message || "Failed to start" });
       setIsProcessing(false);
+      return;
     }
+
+    // Track progress via SSE; fetch result when pipeline completes
+    subscribePipelineStatus(async (status) => {
+      setPipelineStatus(status);
+
+      if (status.stage === "complete") {
+        try {
+          const res = await getLatestResults();
+          setResult(res);
+          const s = await getDashboardStats().catch(() => null);
+          if (s) setStats(s);
+          await refreshSessions();
+          setView("results");
+        } catch (err) {
+          console.warn("Failed to fetch results after pipeline complete", err);
+        } finally {
+          setIsProcessing(false);
+        }
+      } else if (status.stage === "error") {
+        setError(status.message || "Processing failed");
+        setIsProcessing(false);
+      }
+    });
   };
 
   const meta = PAGE_META[view] || PAGE_META.upload;

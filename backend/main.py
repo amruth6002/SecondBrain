@@ -89,23 +89,31 @@ async def health():
     return {"status": "healthy", "model_configured": bool(settings.AZURE_PHI4_API_KEY)}
 
 
-# --- Content Processing ---
+# --- Content Processing (fire-and-forget to avoid Azure 230s timeout) ---
 
-@app.post("/api/process/text", response_model=ProcessingResult)
+async def _run_pipeline_background(text: str, client_id: str):
+    """Run pipeline in the background; persist result when done."""
+    try:
+        result = await run_pipeline(text)
+        _results_store[f"{client_id}_latest"] = result
+        _persist_result(result, client_id)
+    except Exception as e:
+        print(f"[BG PIPELINE ERROR] {e}")
+
+
+@app.post("/api/process/text")
 async def process_text(input_data: ContentInput, x_client_id: str = Header("default")):
-    """Process raw text or notes through the agent pipeline."""
+    """Start text processing pipeline (returns immediately)."""
     if not input_data.text_content:
         raise HTTPException(400, "text_content is required")
 
-    result = await run_pipeline(input_data.text_content)
-    _results_store[f"{x_client_id}_latest"] = result
-    _persist_result(result, x_client_id)
-    return result
+    asyncio.create_task(_run_pipeline_background(input_data.text_content, x_client_id))
+    return {"status": "processing", "message": "Pipeline started. Follow /api/pipeline/status for updates."}
 
 
-@app.post("/api/process/pdf", response_model=ProcessingResult)
+@app.post("/api/process/pdf")
 async def process_pdf(file: UploadFile = File(...), x_client_id: str = Header("default")):
-    """Process a PDF file through the agent pipeline."""
+    """Start PDF processing pipeline (returns immediately)."""
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(400, "Only PDF files are supported")
 
@@ -119,15 +127,13 @@ async def process_pdf(file: UploadFile = File(...), x_client_id: str = Header("d
     if not text.strip():
         raise HTTPException(400, "Could not extract text from PDF. The file may be image-based.")
 
-    result = await run_pipeline(text)
-    _results_store[f"{x_client_id}_latest"] = result
-    _persist_result(result, x_client_id)
-    return result
+    asyncio.create_task(_run_pipeline_background(text, x_client_id))
+    return {"status": "processing", "message": "Pipeline started. Follow /api/pipeline/status for updates."}
 
 
-@app.post("/api/process/youtube", response_model=ProcessingResult)
+@app.post("/api/process/youtube")
 async def process_youtube(input_data: ContentInput, x_client_id: str = Header("default")):
-    """Process a YouTube video through the agent pipeline."""
+    """Start YouTube processing pipeline (returns immediately)."""
     if not input_data.youtube_url:
         raise HTTPException(400, "youtube_url is required")
 
@@ -136,10 +142,8 @@ async def process_youtube(input_data: ContentInput, x_client_id: str = Header("d
     except ValueError as e:
         raise HTTPException(400, str(e))
 
-    result = await run_pipeline(transcript)
-    _results_store[f"{x_client_id}_latest"] = result
-    _persist_result(result, x_client_id)
-    return result
+    asyncio.create_task(_run_pipeline_background(transcript, x_client_id))
+    return {"status": "processing", "message": "Pipeline started. Follow /api/pipeline/status for updates."}
 
 
 # --- Pipeline Status (SSE for real-time updates) ---
