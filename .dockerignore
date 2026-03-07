@@ -1,0 +1,24 @@
+# Git
+.git
+.gitignore
+
+# Node/React
+node_modules/
+frontend/dist/
+frontend/.env
+*.log
+
+# Python/FastAPI
+backend/venv/
+backend/__pycache__/
+backend/.pytest_cache/
+*.pyc
+
+# Local Database & Secrets
+secondbrain.db
+secondbrain.db-journal
+.env
+backend/.env
+
+# Mac/OS
+.DS_Store
