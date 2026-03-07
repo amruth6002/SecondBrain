@@ -65,9 +65,16 @@ app.add_middleware(
 _results_store: dict[str, ProcessingResult] = {}
 _flashcard_store: dict[str, dict] = {}
 
+# Resolve frontend dist path once (used by root route and SPA catch-all)
+_frontend_dist = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "dist")
+
 
 @app.get("/")
 async def root():
+    # Serve React SPA in production; fall back to JSON health-check in dev
+    index_file = os.path.join(_frontend_dist, "index.html")
+    if os.path.isfile(index_file):
+        return FileResponse(index_file)
     return {
         "app": "SecondBrain",
         "version": "1.0.0",
@@ -77,6 +84,7 @@ async def root():
 
 
 @app.get("/health")
+@app.get("/api/health")
 async def health():
     return {"status": "healthy", "model_configured": bool(settings.AZURE_PHI4_API_KEY)}
 
@@ -295,10 +303,8 @@ def _persist_result(result: ProcessingResult, client_id: str):
 
 # --- SPA Static File Serving (For Azure Deployment) ---
 # This must be at the very bottom so it doesn't override /api routes
-frontend_dist = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
-
-if os.path.isdir(frontend_dist):
-    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="assets")
+if os.path.isdir(_frontend_dist):
+    app.mount("/assets", StaticFiles(directory=os.path.join(_frontend_dist, "assets")), name="assets")
 
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str, request: Request):
@@ -306,9 +312,9 @@ if os.path.isdir(frontend_dist):
         # but 404s for /api should return JSON, not the React app)
         if full_path.startswith("api/"):
             raise HTTPException(status_code=404, detail="API route not found")
-            
+
         # For any other route, serve the React index.html
-        index_file = os.path.join(frontend_dist, "index.html")
+        index_file = os.path.join(_frontend_dist, "index.html")
         if os.path.isfile(index_file):
             return FileResponse(index_file)
         raise HTTPException(status_code=404, detail="Frontend build not found")
