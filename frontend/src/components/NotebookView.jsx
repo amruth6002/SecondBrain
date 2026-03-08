@@ -263,13 +263,20 @@ export default function NotebookView({ notebookId, onToast, onRefresh }) {
                             {notebook.blocks.map((block) => (
                                 <div key={block.id} className="block-card">
                                     <div className="block-card-icon">
-                                        <Icon name={BLOCK_ICONS[block.block_type] || "text"} size={18} />
+                                        <Icon name={BLOCK_ICONS[block.block_type] || "text"} size={20} />
                                     </div>
                                     <div className="block-card-content">
-                                        <h4 className="block-title">{block.title || block.block_type.toUpperCase()}</h4>
+                                        <h4 className="block-title">
+                                            {block.title || block.block_type.toUpperCase()}
+                                            <span className="block-badge">{block.block_type}</span>
+                                        </h4>
                                         <p className="block-preview">
-                                            {block.content?.slice(0, 200)}{block.content?.length > 200 ? "…" : ""}
+                                            {block.content?.slice(0, 300)}{block.content?.length > 300 ? "…" : ""}
                                         </p>
+                                        <div className="block-meta">
+                                            <span>{block.content ? `${block.content.length.toLocaleString()} chars` : "Empty"}</span>
+                                            {block.created_at && <span>{new Date(block.created_at).toLocaleDateString()}</span>}
+                                        </div>
                                     </div>
                                     <button className="block-delete-btn" onClick={() => handleDeleteBlock(block.id)} title="Remove block">
                                         <Icon name="xmark" size={14} />
