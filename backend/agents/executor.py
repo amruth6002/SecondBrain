@@ -25,7 +25,7 @@ Given extracted concepts and their connections, you must generate:
    - "apply": Use knowledge (Given scenario Y, how would you apply X?)
    - "analyze": Break down and examine (Compare X and Y, What would happen if...?)
 
-   Generate 2-3 flashcards per concept, varying the Bloom's level.
+   Generate 1-2 flashcards per concept, varying the Bloom's level.
 
 2. A SUMMARY of the material (2-3 paragraphs, student-friendly)
 

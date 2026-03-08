@@ -170,7 +170,9 @@ async def pipeline_status():
                 last_stage = status.stage
                 if status.stage in ("complete", "error"):
                     break
-            await asyncio.sleep(0.5)
+            else:
+                yield ": keepalive\n\n"
+            await asyncio.sleep(1.0)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 

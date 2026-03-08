@@ -48,7 +48,7 @@ Respond with this exact JSON structure:
     ]
 }
 
-Extract 8-15 concepts. Each definition should be clear enough for a student to understand without the original text. Generate AT LEAST 8-12 connections — these are the edges in the knowledge graph and are critical for the visualization. Connections should be meaningful and directional, not trivial."""
+Extract 4-6 concepts. Each definition should be clear enough for a student to understand without the original text. Generate AT LEAST 4-6 connections — these are the edges in the knowledge graph and are critical for the visualization. Connections should be meaningful and directional, not trivial."""
 
 
 async def run_retriever(content: str, plan: ExtractionPlan, existing_concepts: list[str] = None) -> RetrievalResult:
