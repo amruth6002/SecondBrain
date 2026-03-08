@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Icon from "./Icon";
 import KnowledgeGraph from "./KnowledgeGraph";
 import Flashcards from "./Flashcards";
@@ -7,7 +7,7 @@ import AgentPipeline from "./AgentPipeline";
 import {
     getNotebook, addTextBlock, addPDFBlock, addYouTubeBlock,
     deleteBlock, processNotebook, subscribePipelineStatus,
-    renameNotebook,
+    renameNotebook, getNotebookProcessingStatus,
 } from "../api/client";
 
 export default function NotebookView({ notebookId, onToast, onRefresh }) {
@@ -25,6 +25,7 @@ export default function NotebookView({ notebookId, onToast, onRefresh }) {
     const [textTitle, setTextTitle] = useState("");
     const [youtubeUrl, setYoutubeUrl] = useState("");
     const [pdfFile, setPdfFile] = useState(null);
+    const sseRef = useRef(null);
 
     const fetchNotebook = useCallback(async () => {
         try {
@@ -43,8 +44,59 @@ export default function NotebookView({ notebookId, onToast, onRefresh }) {
         fetchNotebook();
         setActiveTab("blocks");
         setAddingBlock(null);
-        setIsProcessing(false);
-    }, [fetchNotebook]);
+
+        // Check if this notebook is already being processed (e.g. after navigation or refresh)
+        let cancelled = false;
+        (async () => {
+            try {
+                const status = await getNotebookProcessingStatus(notebookId);
+                if (cancelled) return;
+                if (status.processing) {
+                    setIsProcessing(true);
+                    setPipelineStatus({ stage: status.stage, progress: status.progress, message: status.message });
+                    // Re-subscribe to SSE to continue tracking
+                    connectSSE();
+                } else {
+                    setIsProcessing(false);
+                }
+            } catch {
+                if (!cancelled) setIsProcessing(false);
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+            // Close any open SSE connection when leaving
+            if (sseRef.current) {
+                sseRef.current.close();
+                sseRef.current = null;
+            }
+        };
+    }, [fetchNotebook, notebookId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const connectSSE = useCallback(() => {
+        // Close existing connection if any
+        if (sseRef.current) {
+            sseRef.current.close();
+            sseRef.current = null;
+        }
+        const es = subscribePipelineStatus((status) => {
+            setPipelineStatus(status);
+            if (status.stage === "complete") {
+                setIsProcessing(false);
+                sseRef.current = null;
+                fetchNotebook();
+                setActiveTab("concepts");
+                onToast?.("Processing complete!", "success");
+                onRefresh?.();
+            } else if (status.stage === "error") {
+                setIsProcessing(false);
+                sseRef.current = null;
+                onToast?.(status.message || "Processing failed", "error");
+            }
+        });
+        sseRef.current = es;
+    }, [fetchNotebook, onToast, onRefresh]);
 
     const handleRename = async () => {
         if (!nameInput.trim() || nameInput === notebook?.name) {
@@ -113,19 +165,7 @@ export default function NotebookView({ notebookId, onToast, onRefresh }) {
             setIsProcessing(false);
             return;
         }
-        subscribePipelineStatus((status) => {
-            setPipelineStatus(status);
-            if (status.stage === "complete") {
-                setIsProcessing(false);
-                fetchNotebook();
-                setActiveTab("concepts");
-                onToast?.("Processing complete!", "success");
-                onRefresh?.();
-            } else if (status.stage === "error") {
-                setIsProcessing(false);
-                onToast?.(status.message || "Processing failed", "error");
-            }
-        });
+        connectSSE();
     };
 
     if (loading) {

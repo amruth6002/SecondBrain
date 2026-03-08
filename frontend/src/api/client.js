@@ -214,6 +214,14 @@ export async function processNotebook(notebookId) {
     return res.json();
 }
 
+export async function getNotebookProcessingStatus(notebookId) {
+    const res = await fetch(`${API_BASE}/api/notebooks/${notebookId}/processing-status`, {
+        headers: getHeaders(),
+    });
+    if (!res.ok) return { processing: false };
+    return res.json();
+}
+
 // --- Knowledge (Cross-notebook) ----------------------------------------------
 
 export async function getKnowledgeGraph() {

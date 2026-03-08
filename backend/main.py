@@ -72,6 +72,7 @@ app.add_middleware(
 # Structure: "client_id_latest" -> ProcessingResult, "client_id_flashcard_id" -> dict
 _results_store: dict[str, ProcessingResult] = {}
 _flashcard_store: dict[str, dict] = {}
+_processing_notebooks: dict[str, str] = {}  # notebook_id -> stage ("planner"|"retriever"|"executor")
 
 # Resolve frontend dist path once (used by root route and SPA catch-all)
 _frontend_dist = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "dist")
@@ -423,6 +424,7 @@ async def delete_block_endpoint(block_id: str):
 
 async def _run_notebook_pipeline_background(notebook_id: str, client_id: str):
     """Process all blocks in a notebook in the background."""
+    _processing_notebooks[notebook_id] = "planner"
     try:
         blocks = get_blocks(notebook_id)
         combined = "\n\n---\n\n".join(
@@ -452,6 +454,8 @@ async def _run_notebook_pipeline_background(notebook_id: str, client_id: str):
                 _flashcard_store[f"{client_id}_{card.id}"] = cd
     except Exception as e:
         print(f"[NOTEBOOK PIPELINE ERROR] {e}")
+    finally:
+        _processing_notebooks.pop(notebook_id, None)
 
 
 @app.post("/api/notebooks/{notebook_id}/process")
@@ -459,11 +463,27 @@ async def process_notebook_endpoint(notebook_id: str, x_client_id: str = Header(
     nb = db_get_notebook(notebook_id, x_client_id)
     if not nb:
         raise HTTPException(404, "Notebook not found")
+    if notebook_id in _processing_notebooks:
+        return {"status": "processing", "message": "Already processing."}
     blocks = get_blocks(notebook_id)
     if not blocks:
         raise HTTPException(400, "Notebook has no content blocks. Add some content first.")
     asyncio.create_task(_run_notebook_pipeline_background(notebook_id, x_client_id))
     return {"status": "processing", "message": "Pipeline started for notebook."}
+
+
+@app.get("/api/notebooks/{notebook_id}/processing-status")
+async def notebook_processing_status(notebook_id: str):
+    """Check whether a notebook is currently being processed."""
+    if notebook_id in _processing_notebooks:
+        status = get_current_status()
+        return {
+            "processing": True,
+            "stage": status.stage,
+            "progress": status.progress,
+            "message": status.message,
+        }
+    return {"processing": False}
 
 
 # --- Knowledge (Cross-notebook) -----------------------------------------------
