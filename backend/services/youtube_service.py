@@ -1,6 +1,13 @@
-"""YouTube transcript extraction service using yt-dlp."""
+"""YouTube transcript extraction service using yt-dlp.
+
+Strategies tried in order:
+1. yt-dlp with browser cookies (Firefox → Chrome)
+2. yt-dlp with cookies file (YOUTUBE_COOKIES_FILE env var, for deployment)
+3. yt-dlp plain (no auth — works when IP isn't flagged)
+"""
 
 import json
+import os
 import re
 import urllib.request
 
@@ -22,21 +29,12 @@ def extract_youtube_id(url: str) -> str:
     raise ValueError(f"Could not extract video ID from URL: {url}")
 
 
-def extract_transcript(youtube_url: str) -> str:
-    """Extract transcript text from a YouTube video using yt-dlp.
+# ---------------------------------------------------------------------------
+# Strategy helpers
+# ---------------------------------------------------------------------------
 
-    Uses yt-dlp to fetch subtitles (manual or auto-generated) and parses
-    the json3 subtitle format to extract plain text.
-
-    Args:
-        youtube_url: Full YouTube URL
-
-    Returns:
-        Full transcript as a single string
-    """
-    video_id = extract_youtube_id(youtube_url)
-
-    ydl_opts = {
+def _base_opts() -> dict:
+    return {
         "skip_download": True,
         "writesubtitles": True,
         "writeautomaticsub": True,
@@ -45,53 +43,106 @@ def extract_transcript(youtube_url: str) -> str:
         "no_warnings": True,
     }
 
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(youtube_url, download=False)
-    except Exception as e:
-        raise ValueError(
-            f"Could not fetch video info for {video_id}. Error: {e}"
-        )
 
-    # Prefer manual subs, fall back to auto-generated
+def _build_strategies() -> list[tuple[str, dict]]:
+    """Return a list of (label, ydl_opts) to try in order."""
+    strategies: list[tuple[str, dict]] = []
+
+    # 1. Browser cookies (local dev)
+    for browser in ("firefox", "chrome", "chromium", "brave", "edge"):
+        opts = _base_opts()
+        opts["cookiesfrombrowser"] = (browser,)
+        strategies.append((f"yt-dlp + {browser} cookies", opts))
+
+    # 2. Cookies file (server / CI / Azure)
+    cookies_file = os.environ.get("YOUTUBE_COOKIES_FILE", "")
+    if cookies_file and os.path.isfile(cookies_file):
+        opts = _base_opts()
+        opts["cookiefile"] = cookies_file
+        strategies.append(("yt-dlp + cookies file", opts))
+
+    # 3. Plain (no auth)
+    strategies.append(("yt-dlp (no auth)", _base_opts()))
+
+    return strategies
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def extract_transcript(youtube_url: str) -> str:
+    """Extract transcript text from a YouTube video.
+
+    Tries multiple yt-dlp strategies (browser cookies → cookies file → plain).
+
+    Args:
+        youtube_url: Full YouTube URL
+
+    Returns:
+        Full transcript as a single string
+    """
+    video_id = extract_youtube_id(youtube_url)
+    strategies = _build_strategies()
+    last_error = None
+
+    for label, opts in strategies:
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(youtube_url, download=False)
+
+            transcript = _extract_subs_from_info(info, video_id)
+            if transcript:
+                print(f"[YT] Success with strategy: {label}")
+                return transcript
+        except Exception as e:
+            last_error = e
+            # Don't spam logs for expected browser-not-found failures
+            if "cookie" not in str(e).lower() and "browser" not in str(e).lower():
+                print(f"[YT] Strategy '{label}' failed: {e}")
+            continue
+
+    raise ValueError(
+        f"Could not get transcript for video {video_id}. "
+        f"YouTube is blocking requests — try logging into YouTube in Firefox or Chrome "
+        f"on this machine so cookies can be used. Last error: {last_error}"
+    )
+
+
+def _extract_subs_from_info(info: dict, video_id: str) -> str | None:
+    """Given yt-dlp info dict, find and download English subtitles."""
     subs = info.get("subtitles", {})
     auto_subs = info.get("automatic_captions", {})
 
     en_subs = None
-    for lang in ["en", "en-US", "en-GB"]:
+    for lang in ("en", "en-US", "en-GB"):
         en_subs = subs.get(lang) or auto_subs.get(lang)
         if en_subs:
             break
 
     if not en_subs:
-        raise ValueError(
-            f"No English subtitles found for video {video_id}. "
-            "The video may not have captions."
-        )
+        return None
 
-    # Find the json3 format URL for structured parsing
-    json3_url = None
-    srt_url = None
-    vtt_url = None
+    # Pick best format: json3 > srt > vtt
+    urls_by_format: dict[str, str] = {}
     for fmt in en_subs:
-        if fmt["ext"] == "json3":
-            json3_url = fmt["url"]
-        elif fmt["ext"] == "srt":
-            srt_url = fmt["url"]
-        elif fmt["ext"] == "vtt":
-            vtt_url = fmt["url"]
+        urls_by_format[fmt["ext"]] = fmt["url"]
 
-    if json3_url:
-        return _parse_json3(json3_url, video_id)
-    elif srt_url:
-        return _parse_text_subs(srt_url, video_id)
-    elif vtt_url:
-        return _parse_text_subs(vtt_url, video_id)
-    else:
-        raise ValueError(
-            f"No parseable subtitle format found for video {video_id}."
-        )
+    for ext in ("json3", "srt", "vtt"):
+        url = urls_by_format.get(ext)
+        if not url:
+            continue
+        if ext == "json3":
+            return _parse_json3(url, video_id)
+        else:
+            return _parse_text_subs(url, video_id)
 
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Subtitle parsers
+# ---------------------------------------------------------------------------
 
 def _parse_json3(url: str, video_id: str) -> str:
     """Parse json3 subtitle format into plain text."""
@@ -99,9 +150,7 @@ def _parse_json3(url: str, video_id: str) -> str:
         resp = urllib.request.urlopen(url, timeout=30)
         data = json.loads(resp.read())
     except Exception as e:
-        raise ValueError(
-            f"Failed to download subtitles for {video_id}. Error: {e}"
-        )
+        raise ValueError(f"Failed to download subtitles for {video_id}. Error: {e}")
 
     events = data.get("events", [])
     texts = []
@@ -123,15 +172,11 @@ def _parse_text_subs(url: str, video_id: str) -> str:
         resp = urllib.request.urlopen(url, timeout=30)
         raw = resp.read().decode("utf-8")
     except Exception as e:
-        raise ValueError(
-            f"Failed to download subtitles for {video_id}. Error: {e}"
-        )
+        raise ValueError(f"Failed to download subtitles for {video_id}. Error: {e}")
 
-    # Strip timestamps and formatting, keep text lines
     lines = []
     for line in raw.splitlines():
         line = line.strip()
-        # Skip blank lines, sequence numbers, timestamps
         if not line:
             continue
         if re.match(r"^\d+$", line):
@@ -140,7 +185,6 @@ def _parse_text_subs(url: str, video_id: str) -> str:
             continue
         if line.startswith("WEBVTT") or line.startswith("Kind:") or line.startswith("Language:"):
             continue
-        # Strip HTML tags
         line = re.sub(r"<[^>]+>", "", line)
         if line:
             lines.append(line)
