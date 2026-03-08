@@ -131,6 +131,7 @@ class ProcessingResult(BaseModel):
     graph_edges: list[KnowledgeGraphEdge] = Field(default_factory=list)
     summary: str = ""
     error: Optional[str] = None
+    overlap: Optional[dict] = Field(default=None, description="Overlap with existing knowledge")
 
 
 class SessionSummary(BaseModel):
@@ -139,3 +140,46 @@ class SessionSummary(BaseModel):
     created_at: str
     title: str
     summary: str
+
+
+# --- Notebook Models ---
+
+class BlockCreate(BaseModel):
+    """Input for creating a new content block."""
+    block_type: str = Field(..., description="text, pdf, or youtube")
+    title: str = Field(default="", description="Block title")
+    content: str = Field(default="", description="Block content")
+
+
+class Block(BaseModel):
+    """A content block within a notebook."""
+    id: str
+    notebook_id: str
+    block_type: str
+    title: str = ""
+    content: str = ""
+    position: int = 0
+    created_at: str = ""
+
+
+class NotebookSummary(BaseModel):
+    """Lightweight notebook info for the sidebar."""
+    id: str
+    name: str
+    created_at: str
+    updated_at: str
+    block_count: int = 0
+
+
+class NotebookDetail(BaseModel):
+    """Full notebook with blocks and extracted knowledge."""
+    id: str
+    name: str
+    created_at: str
+    updated_at: str
+    blocks: list[Block] = Field(default_factory=list)
+    concepts: list[dict] = Field(default_factory=list)
+    flashcards: list[dict] = Field(default_factory=list)
+    graph_nodes: list[dict] = Field(default_factory=list)
+    graph_edges: list[dict] = Field(default_factory=list)
+    overlap: Optional[dict] = None

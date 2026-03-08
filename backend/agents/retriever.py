@@ -51,12 +51,13 @@ Respond with this exact JSON structure:
 Extract 8-15 concepts. Each definition should be clear enough for a student to understand without the original text. Generate AT LEAST 8-12 connections — these are the edges in the knowledge graph and are critical for the visualization. Connections should be meaningful and directional, not trivial."""
 
 
-async def run_retriever(content: str, plan: ExtractionPlan) -> RetrievalResult:
+async def run_retriever(content: str, plan: ExtractionPlan, existing_concepts: list[str] = None) -> RetrievalResult:
     """Run the Retriever Agent using the Planner's extraction plan.
 
     Args:
         content: Raw text content
         plan: ExtractionPlan from the Planner Agent
+        existing_concepts: List of concept names the student already knows
 
     Returns:
         RetrievalResult with concepts, connections, and insights
@@ -65,11 +66,20 @@ async def run_retriever(content: str, plan: ExtractionPlan) -> RetrievalResult:
     if len(content) > max_chars:
         content = content[:max_chars] + "\n\n[Content truncated]"
 
+    existing_note = ""
+    if existing_concepts:
+        existing_note = (
+            "\n\nEXISTING KNOWLEDGE (the student already knows these concepts):\n"
+            + ", ".join(existing_concepts[:50])
+            + "\n\nFor any extracted concept that overlaps with existing knowledge, "
+            "prefix its source_context with 'OVERLAP:' so the system can detect it."
+        )
+
     user_message = f"""EXTRACTION PLAN FROM PLANNER:
 - Topics to extract: {', '.join(plan.topics_to_extract)}
 - Learning objectives: {', '.join(plan.learning_objectives)}
 - Connections to find: {', '.join(plan.connections_to_find)}
-- Difficulty level: {plan.difficulty_level}
+- Difficulty level: {plan.difficulty_level}{existing_note}
 
 ORIGINAL CONTENT:
 {content}

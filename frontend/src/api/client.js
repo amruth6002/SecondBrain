@@ -116,3 +116,120 @@ export async function deleteSession(sessionId) {
     if (!res.ok) throw new Error(await res.text());
     return res.json();
 }
+
+// --- Notebooks ---------------------------------------------------------------
+
+export async function createNotebook(name = "Untitled Notebook") {
+    const res = await fetch(`${API_BASE}/api/notebooks`, {
+        method: "POST",
+        headers: getHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ name }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}
+
+export async function getNotebooks() {
+    const res = await fetch(`${API_BASE}/api/notebooks`, { headers: getHeaders() });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}
+
+export async function getNotebook(notebookId) {
+    const res = await fetch(`${API_BASE}/api/notebooks/${notebookId}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}
+
+export async function renameNotebook(notebookId, name) {
+    const res = await fetch(`${API_BASE}/api/notebooks/${notebookId}`, {
+        method: "PUT",
+        headers: getHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ name }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}
+
+export async function deleteNotebook(notebookId) {
+    const res = await fetch(`${API_BASE}/api/notebooks/${notebookId}`, {
+        method: "DELETE",
+        headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}
+
+// --- Blocks ------------------------------------------------------------------
+
+export async function addTextBlock(notebookId, title, content) {
+    const res = await fetch(`${API_BASE}/api/notebooks/${notebookId}/blocks`, {
+        method: "POST",
+        headers: getHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ title, content }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}
+
+export async function addPDFBlock(notebookId, file) {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(`${API_BASE}/api/notebooks/${notebookId}/blocks/pdf`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: formData,
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}
+
+export async function addYouTubeBlock(notebookId, youtubeUrl) {
+    const res = await fetch(`${API_BASE}/api/notebooks/${notebookId}/blocks/youtube`, {
+        method: "POST",
+        headers: getHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ youtube_url: youtubeUrl }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}
+
+export async function deleteBlock(blockId) {
+    const res = await fetch(`${API_BASE}/api/blocks/${blockId}`, {
+        method: "DELETE",
+        headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}
+
+// --- Process Notebook --------------------------------------------------------
+
+export async function processNotebook(notebookId) {
+    const res = await fetch(`${API_BASE}/api/notebooks/${notebookId}/process`, {
+        method: "POST",
+        headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}
+
+// --- Knowledge (Cross-notebook) ----------------------------------------------
+
+export async function getKnowledgeGraph() {
+    const res = await fetch(`${API_BASE}/api/knowledge/graph`, { headers: getHeaders() });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}
+
+export async function searchKnowledge(query) {
+    const res = await fetch(`${API_BASE}/api/knowledge/search?q=${encodeURIComponent(query)}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}
+
+export async function getDueFlashcards() {
+    const res = await fetch(`${API_BASE}/api/flashcards/due`, { headers: getHeaders() });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}

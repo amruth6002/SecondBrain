@@ -1,104 +1,62 @@
 import { useState, useCallback, useEffect } from "react";
 import Icon from "./components/Icon";
-import Upload from "./components/Upload";
-import AgentPipeline from "./components/AgentPipeline";
+import NotebookView from "./components/NotebookView";
 import KnowledgeGraph from "./components/KnowledgeGraph";
 import Flashcards from "./components/Flashcards";
 import Dashboard from "./components/Dashboard";
-import Concepts from "./components/Concepts";
 import {
-  processText,
-  processPDF,
-  processYouTube,
-  subscribePipelineStatus,
   getDashboardStats,
-  getLatestResults,
-  getSessions,
-  getSession,
-  deleteSession,
+  getNotebooks,
+  createNotebook,
+  deleteNotebook,
+  getKnowledgeGraph,
+  getDueFlashcards,
 } from "./api/client";
 import "./index.css";
 
 const NAV_ITEMS = [
-  { id: "upload", icon: "upload", label: "Upload", desc: "Add new content" },
-  { id: "pipeline", icon: "pipeline", label: "Pipeline", desc: "Agent processing" },
-  { id: "results", icon: "results", label: "Results", desc: "View insights" },
+  { id: "dashboard", icon: "results", label: "Dashboard" },
+  { id: "graph", icon: "graph", label: "Knowledge Graph" },
+  { id: "review", icon: "cards", label: "Review" },
 ];
-
-const PAGE_META = {
-  upload: { title: "Upload Content", subtitle: "Feed your brain with knowledge from any source" },
-  pipeline: { title: "Agent Pipeline", subtitle: "Watch your AI agents process in real-time" },
-  results: { title: "Results", subtitle: "Your extracted knowledge at a glance" },
-};
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "dark");
-  const [view, setView] = useState("upload");
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [pipelineStatus, setPipelineStatus] = useState({
-    stage: "idle",
-    progress: 0,
-    message: "",
-  });
-  const [result, setResult] = useState(null);
+  const [view, setView] = useState("dashboard");
+  const [selectedNotebookId, setSelectedNotebookId] = useState(null);
+  const [notebooks, setNotebooks] = useState([]);
   const [stats, setStats] = useState({});
-  const [error, setError] = useState(null);
+  const [graphData, setGraphData] = useState({ nodes: [], edges: [] });
+  const [dueCards, setDueCards] = useState([]);
   const [toasts, setToasts] = useState([]);
-  const [sessions, setSessions] = useState([]);
 
-  // Load session history on mount and after each new process
-  const refreshSessions = useCallback(async () => {
-    try {
-      setSessions(await getSessions());
-    } catch (err) {
-      console.warn("Silent fallback: Failed to fetch initial sessions", err);
-    }
+  const refreshNotebooks = useCallback(async () => {
+    try { setNotebooks(await getNotebooks()); } catch {}
+  }, []);
+
+  const refreshStats = useCallback(async () => {
+    try { setStats(await getDashboardStats()); } catch {}
+  }, []);
+
+  const refreshGraph = useCallback(async () => {
+    try { setGraphData(await getKnowledgeGraph()); } catch {}
+  }, []);
+
+  const refreshDueCards = useCallback(async () => {
+    try { setDueCards(await getDueFlashcards()); } catch {}
   }, []);
 
   useEffect(() => {
-    refreshSessions();
-  }, [refreshSessions]);
+    refreshNotebooks();
+    refreshStats();
+  }, [refreshNotebooks, refreshStats]);
 
-  // Sync theme with document attribute and localStorage
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("theme", theme);
   }, [theme]);
 
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
-  };
-
-  const loadSession = async (sessionId) => {
-    try {
-      const res = await getSession(sessionId);
-      setResult(res);
-      const s = await getDashboardStats();
-      setStats(s);
-      setView("results");
-      addToast("Session loaded", "success");
-    } catch (err) {
-      console.error("Failed to load the specific session data:", err);
-      addToast("Failed to load session", "error");
-    }
-  };
-
-  const handleDeleteSession = async (sessionId, e) => {
-    e.stopPropagation();
-    try {
-      await deleteSession(sessionId);
-      await refreshSessions();
-      // Clear current result if we deleted the active session
-      if (result?.session_id === sessionId) {
-        setResult(null);
-        setStats({});
-      }
-      addToast("Session deleted", "success");
-    } catch (err) {
-      console.error("Failed to delete session:", err);
-      addToast("Failed to delete session", "error");
-    }
-  };
+  const toggleTheme = () => setTheme((prev) => (prev === "dark" ? "light" : "dark"));
 
   const addToast = useCallback((message, type = "info") => {
     const id = Date.now();
@@ -106,49 +64,49 @@ export default function App() {
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
   }, []);
 
-  const handleProcess = async ({ type, data }) => {
-    setIsProcessing(true);
-    setError(null);
-    setView("pipeline");
-    setPipelineStatus({ stage: "planner", progress: 5, message: "Starting..." });
-
+  const handleCreateNotebook = async () => {
     try {
-      // Fire the pipeline (returns immediately; backend runs it in the background)
-      if (type === "text") await processText(data);
-      else if (type === "pdf") await processPDF(data);
-      else if (type === "youtube") await processYouTube(data);
-    } catch (e) {
-      setError(e.message || "Failed to start processing");
-      setPipelineStatus({ stage: "error", progress: 0, message: e.message || "Failed to start" });
-      setIsProcessing(false);
-      return;
-    }
-
-    // Track progress via SSE; fetch result when pipeline completes
-    subscribePipelineStatus(async (status) => {
-      setPipelineStatus(status);
-
-      if (status.stage === "complete") {
-        try {
-          const res = await getLatestResults();
-          setResult(res);
-          const s = await getDashboardStats().catch(() => null);
-          if (s) setStats(s);
-          await refreshSessions();
-          setView("results");
-        } catch (err) {
-          console.warn("Failed to fetch results after pipeline complete", err);
-        } finally {
-          setIsProcessing(false);
-        }
-      } else if (status.stage === "error") {
-        setError(status.message || "Processing failed");
-        setIsProcessing(false);
-      }
-    });
+      const nb = await createNotebook("Untitled Notebook");
+      await refreshNotebooks();
+      setSelectedNotebookId(nb.id);
+      setView("notebook");
+      addToast("Notebook created", "success");
+    } catch { addToast("Failed to create notebook", "error"); }
   };
 
-  const meta = PAGE_META[view] || PAGE_META.upload;
+  const handleSelectNotebook = (nbId) => {
+    setSelectedNotebookId(nbId);
+    setView("notebook");
+  };
+
+  const handleDeleteNotebook = async (nbId, e) => {
+    e.stopPropagation();
+    try {
+      await deleteNotebook(nbId);
+      await refreshNotebooks();
+      if (selectedNotebookId === nbId) {
+        setSelectedNotebookId(null);
+        setView("dashboard");
+      }
+      addToast("Notebook deleted", "success");
+    } catch { addToast("Failed to delete notebook", "error"); }
+  };
+
+  const handleNavClick = (navId) => {
+    setView(navId);
+    setSelectedNotebookId(null);
+    if (navId === "graph") refreshGraph();
+    if (navId === "review") refreshDueCards();
+    if (navId === "dashboard") refreshStats();
+  };
+
+  const pageMeta = {
+    dashboard: { title: "Dashboard", subtitle: "Your learning overview" },
+    notebook: { title: notebooks.find(n => n.id === selectedNotebookId)?.name || "Notebook", subtitle: "Manage content and extract knowledge" },
+    graph: { title: "Knowledge Graph", subtitle: "All concepts across your notebooks" },
+    review: { title: "Flashcard Review", subtitle: "Due cards for spaced repetition" },
+  };
+  const meta = pageMeta[view] || pageMeta.dashboard;
 
   return (
     <div className="app-shell">
@@ -166,7 +124,7 @@ export default function App() {
             <button
               key={item.id}
               className={`nav-item ${view === item.id ? "active" : ""}`}
-              onClick={() => setView(item.id)}
+              onClick={() => handleNavClick(item.id)}
             >
               <Icon name={item.icon} size={18} className="nav-icon" />
               {item.label}
@@ -174,34 +132,49 @@ export default function App() {
           ))}
         </nav>
 
-        {sessions.length > 0 && (
-          <div className="session-history">
-            <p className="sidebar-label">Recent Sessions</p>
-            {sessions.slice(0, 6).map((s) => (
-              <div key={s.id} className="session-item">
-                <button
-                  className="session-load-area"
-                  onClick={() => loadSession(s.id)}
-                  title={s.summary || s.title}
-                >
-                  <Icon name="book" size={13} className="session-icon" />
-                  <span className="session-item-text">{s.title}</span>
-                </button>
-                <button
-                  className="session-del-btn"
-                  onClick={(e) => handleDeleteSession(s.id, e)}
-                  title="Delete session"
-                >
-                  <Icon name="xmark" size={11} />
-                </button>
-              </div>
-            ))}
+        {/* Notebooks Section */}
+        <div className="notebooks-section">
+          <div className="notebooks-header">
+            <p className="sidebar-label">Notebooks</p>
+            <button className="new-notebook-btn" onClick={handleCreateNotebook} title="New Notebook">
+              <Icon name="text" size={14} />
+              <span>New</span>
+            </button>
           </div>
-        )}
+          {notebooks.length === 0 ? (
+            <p className="sidebar-empty">No notebooks yet</p>
+          ) : (
+            <div className="notebook-list">
+              {notebooks.map((nb) => (
+                <div
+                  key={nb.id}
+                  className={`notebook-item ${view === "notebook" && selectedNotebookId === nb.id ? "active" : ""}`}
+                >
+                  <button
+                    className="notebook-load-area"
+                    onClick={() => handleSelectNotebook(nb.id)}
+                    title={nb.name}
+                  >
+                    <Icon name="book" size={13} className="notebook-icon" />
+                    <span className="notebook-item-text">{nb.name}</span>
+                    {nb.block_count > 0 && <span className="notebook-block-count">{nb.block_count}</span>}
+                  </button>
+                  <button
+                    className="notebook-del-btn"
+                    onClick={(e) => handleDeleteNotebook(nb.id, e)}
+                    title="Delete notebook"
+                  >
+                    <Icon name="xmark" size={11} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="sidebar-footer">
           <p>Built for AI Unlocked 2026</p>
-          <p className="tech-stack">Azure AI · Phi-4 · AutoGen</p>
+          <p className="tech-stack">Azure AI · Phi-4 · Knowledge Agents</p>
         </div>
       </aside>
 
@@ -211,7 +184,7 @@ export default function App() {
           <button
             key={item.id}
             className={`nav-item ${view === item.id ? "active" : ""}`}
-            onClick={() => setView(item.id)}
+            onClick={() => handleNavClick(item.id)}
           >
             <Icon name={item.icon} size={18} className="nav-icon" />
             {item.label}
@@ -231,55 +204,46 @@ export default function App() {
           </button>
         </div>
 
-        <div className="content-area" key={view}>
-          {/* Error Banner */}
-          {error && (
-            <div className="error-banner">
-              <Icon name="exclamation" size={16} />
-              <span className="error-text">{error}</span>
-              <button className="error-close" onClick={() => setError(null)}>
-                <Icon name="xmark" size={14} />
-              </button>
-            </div>
-          )}
-
-          {view === "upload" && (
-            <Upload onProcess={handleProcess} isProcessing={isProcessing} />
-          )}
-
-          {view === "pipeline" && (
-            <div className="pipeline-split">
-              <AgentPipeline status={pipelineStatus} variant="stepper" />
-              <AgentPipeline status={pipelineStatus} variant="feed" />
-            </div>
-          )}
-
-          {view === "results" && result && (
+        <div className="content-area" key={view === "notebook" ? `nb-${selectedNotebookId}` : view}>
+          {/* Dashboard */}
+          {view === "dashboard" && (
             <div className="results-layout">
-              <Dashboard stats={stats} summary={result.summary} />
-              <KnowledgeGraph
-                nodes={result.graph_nodes || []}
-                edges={result.graph_edges || []}
-              />
-              <Flashcards
-                flashcards={result.flashcards || []}
-                onToast={addToast}
-                onUpdate={async () => {
-                  const s = await getDashboardStats();
-                  setStats(s);
-                }}
-              />
-              <Concepts concepts={result.concepts || []} />
+              <Dashboard stats={stats} summary={stats.summary || ""} />
+              {notebooks.length === 0 && (
+                <div className="card">
+                  <div className="empty-state">
+                    <Icon name="book" size={48} className="empty-icon" />
+                    <p>Create your first notebook to get started</p>
+                    <button className="btn btn-primary" onClick={handleCreateNotebook} style={{ marginTop: "1rem" }}>
+                      <Icon name="text" size={16} /> New Notebook
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          {view === "results" && !result && (
-            <div className="card">
-              <div className="empty-state">
-                <Icon name="results" size={48} className="empty-icon" />
-                <p>No results yet. Upload some content to get started.</p>
-              </div>
-            </div>
+          {/* Notebook View */}
+          {view === "notebook" && selectedNotebookId && (
+            <NotebookView
+              notebookId={selectedNotebookId}
+              onToast={addToast}
+              onRefresh={() => { refreshNotebooks(); refreshStats(); }}
+            />
+          )}
+
+          {/* Knowledge Graph */}
+          {view === "graph" && (
+            <KnowledgeGraph nodes={graphData.nodes || []} edges={graphData.edges || []} />
+          )}
+
+          {/* Review */}
+          {view === "review" && (
+            <Flashcards
+              flashcards={dueCards}
+              onToast={addToast}
+              onUpdate={() => { refreshDueCards(); refreshStats(); }}
+            />
           )}
         </div>
       </div>
@@ -288,10 +252,7 @@ export default function App() {
       <div className="toast-container">
         {toasts.map((t) => (
           <div key={t.id} className={`toast toast-${t.type}`}>
-            <Icon
-              name={t.type === "success" ? "check" : t.type === "error" ? "xmark" : "pipeline"}
-              size={14}
-            />
+            <Icon name={t.type === "success" ? "check" : t.type === "error" ? "xmark" : "pipeline"} size={14} />
             <span>{t.message}</span>
             <button className="toast-close" onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}>
               <Icon name="xmark" size={12} />

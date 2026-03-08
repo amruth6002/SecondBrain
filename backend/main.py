@@ -6,6 +6,7 @@ Agents: Planner → Retriever → Executor
 
 import asyncio
 import json
+import uuid
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, HTTPException, Header, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,6 +25,13 @@ from utils.database import (
     init_db, save_session, get_all_sessions, get_session_result_json,
     get_latest_session_result_json, save_flashcard, get_all_flashcards_from_db,
     update_flashcard_sm2, delete_session,
+    create_notebook, get_all_notebooks, get_notebook as db_get_notebook,
+    rename_notebook, delete_notebook,
+    add_block as db_add_block, get_blocks, delete_block as db_delete_block,
+    save_concepts_for_notebook, get_all_concepts, get_concepts_for_notebook,
+    search_concepts, save_graph_edges_for_notebook, get_all_graph_edges,
+    get_graph_edges_for_notebook, save_flashcards_for_notebook,
+    get_flashcards_for_notebook,
 )
 
 
@@ -284,6 +292,209 @@ async def delete_session_endpoint(session_id: str, x_client_id: str = Header("de
         _flashcard_store.pop(k, None)
         
     return {"deleted": session_id}
+
+
+# --- Notebooks ----------------------------------------------------------------
+
+@app.post("/api/notebooks")
+async def create_notebook_endpoint(body: dict, x_client_id: str = Header("default")):
+    nb_id = str(uuid.uuid4())[:8]
+    name = body.get("name", "Untitled Notebook")
+    nb = create_notebook(nb_id, name, x_client_id)
+    return nb
+
+
+@app.get("/api/notebooks")
+async def list_notebooks(x_client_id: str = Header("default")):
+    return get_all_notebooks(client_id=x_client_id)
+
+
+@app.get("/api/notebooks/{notebook_id}")
+async def get_notebook_detail(notebook_id: str, x_client_id: str = Header("default")):
+    nb = db_get_notebook(notebook_id, x_client_id)
+    if not nb:
+        raise HTTPException(404, "Notebook not found")
+    blocks = get_blocks(notebook_id)
+    concepts_rows = get_concepts_for_notebook(notebook_id, x_client_id)
+    flashcards = get_flashcards_for_notebook(notebook_id, x_client_id)
+    edges = get_graph_edges_for_notebook(notebook_id, x_client_id)
+    graph_nodes = [
+        {"id": c["id"], "label": c["name"], "category": c.get("category", ""),
+         "importance": c.get("importance", "medium"), "definition": c.get("definition", "")}
+        for c in concepts_rows
+    ]
+    graph_edges = [
+        {"source": e["source_concept_id"], "target": e["target_concept_id"],
+         "label": e.get("relationship", ""), "strength": e.get("strength", 0.5)}
+        for e in edges
+    ]
+    return {
+        "id": nb["id"], "name": nb["name"],
+        "created_at": nb.get("created_at", ""),
+        "updated_at": nb.get("updated_at", ""),
+        "blocks": blocks,
+        "concepts": concepts_rows,
+        "flashcards": flashcards,
+        "graph_nodes": graph_nodes,
+        "graph_edges": graph_edges,
+    }
+
+
+@app.put("/api/notebooks/{notebook_id}")
+async def rename_notebook_endpoint(notebook_id: str, body: dict, x_client_id: str = Header("default")):
+    name = body.get("name", "")
+    if not name.strip():
+        raise HTTPException(400, "Name is required")
+    ok = rename_notebook(notebook_id, name, x_client_id)
+    if not ok:
+        raise HTTPException(404, "Notebook not found")
+    return {"id": notebook_id, "name": name}
+
+
+@app.delete("/api/notebooks/{notebook_id}")
+async def delete_notebook_endpoint(notebook_id: str, x_client_id: str = Header("default")):
+    ok = delete_notebook(notebook_id, x_client_id)
+    if not ok:
+        raise HTTPException(404, "Notebook not found")
+    return {"deleted": notebook_id}
+
+
+# --- Blocks -------------------------------------------------------------------
+
+@app.post("/api/notebooks/{notebook_id}/blocks")
+async def add_text_block(notebook_id: str, body: dict, x_client_id: str = Header("default")):
+    nb = db_get_notebook(notebook_id, x_client_id)
+    if not nb:
+        raise HTTPException(404, "Notebook not found")
+    title = body.get("title", "Text notes")
+    content = body.get("content", "")
+    if not content.strip():
+        raise HTTPException(400, "Content is required")
+    block_id = str(uuid.uuid4())[:8]
+    db_add_block(block_id, notebook_id, "text", title, content)
+    return {"id": block_id, "block_type": "text", "title": title}
+
+
+@app.post("/api/notebooks/{notebook_id}/blocks/pdf")
+async def add_pdf_block(notebook_id: str, file: UploadFile = File(...), x_client_id: str = Header("default")):
+    nb = db_get_notebook(notebook_id, x_client_id)
+    if not nb:
+        raise HTTPException(404, "Notebook not found")
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(400, "Only PDF files")
+    contents = await file.read()
+    if len(contents) > settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024:
+        raise HTTPException(400, f"File too large. Max: {settings.MAX_UPLOAD_SIZE_MB}MB")
+    text = extract_text_from_pdf(contents)
+    if not text.strip():
+        raise HTTPException(400, "Could not extract text from PDF.")
+    block_id = str(uuid.uuid4())[:8]
+    db_add_block(block_id, notebook_id, "pdf", file.filename or "PDF", text)
+    return {"id": block_id, "block_type": "pdf", "title": file.filename}
+
+
+@app.post("/api/notebooks/{notebook_id}/blocks/youtube")
+async def add_youtube_block(notebook_id: str, body: dict, x_client_id: str = Header("default")):
+    nb = db_get_notebook(notebook_id, x_client_id)
+    if not nb:
+        raise HTTPException(404, "Notebook not found")
+    url = body.get("youtube_url", "")
+    if not url:
+        raise HTTPException(400, "youtube_url is required")
+    try:
+        transcript = extract_transcript(url)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    block_id = str(uuid.uuid4())[:8]
+    title = f"YouTube: {url[:60]}"
+    db_add_block(block_id, notebook_id, "youtube", title, transcript)
+    return {"id": block_id, "block_type": "youtube", "title": title}
+
+
+@app.delete("/api/blocks/{block_id}")
+async def delete_block_endpoint(block_id: str):
+    ok = db_delete_block(block_id)
+    if not ok:
+        raise HTTPException(404, "Block not found")
+    return {"deleted": block_id}
+
+
+# --- Process Notebook ---------------------------------------------------------
+
+async def _run_notebook_pipeline_background(notebook_id: str, client_id: str):
+    """Process all blocks in a notebook in the background."""
+    try:
+        blocks = get_blocks(notebook_id)
+        combined = "\n\n---\n\n".join(
+            f"[{b['block_type'].upper()}: {b['title']}]\n{b['content']}"
+            for b in blocks if b.get("content")
+        )
+        if not combined.strip():
+            return
+
+        result = await run_pipeline(combined, notebook_id=notebook_id, client_id=client_id)
+
+        if result.success:
+            concepts_dicts = [c.model_dump() for c in result.concepts]
+            save_concepts_for_notebook(concepts_dicts, notebook_id, client_id)
+
+            edges_dicts = [e.model_dump() for e in result.graph_edges]
+            save_graph_edges_for_notebook(edges_dicts, notebook_id, client_id)
+
+            flashcard_dicts = [f.model_dump() for f in result.flashcards]
+            save_flashcards_for_notebook(flashcard_dicts, notebook_id, result.session_id, client_id)
+
+            _results_store[f"{client_id}_latest"] = result
+            for card in result.flashcards:
+                cd = card.model_dump()
+                cd["session_id"] = result.session_id
+                cd["notebook_id"] = notebook_id
+                _flashcard_store[f"{client_id}_{card.id}"] = cd
+    except Exception as e:
+        print(f"[NOTEBOOK PIPELINE ERROR] {e}")
+
+
+@app.post("/api/notebooks/{notebook_id}/process")
+async def process_notebook_endpoint(notebook_id: str, x_client_id: str = Header("default")):
+    nb = db_get_notebook(notebook_id, x_client_id)
+    if not nb:
+        raise HTTPException(404, "Notebook not found")
+    blocks = get_blocks(notebook_id)
+    if not blocks:
+        raise HTTPException(400, "Notebook has no content blocks. Add some content first.")
+    asyncio.create_task(_run_notebook_pipeline_background(notebook_id, x_client_id))
+    return {"status": "processing", "message": "Pipeline started for notebook."}
+
+
+# --- Knowledge (Cross-notebook) -----------------------------------------------
+
+@app.get("/api/knowledge/concepts")
+async def list_all_concepts(x_client_id: str = Header("default")):
+    return get_all_concepts(client_id=x_client_id)
+
+
+@app.get("/api/knowledge/graph")
+async def get_full_knowledge_graph(x_client_id: str = Header("default")):
+    concepts = get_all_concepts(client_id=x_client_id)
+    edges = get_all_graph_edges(client_id=x_client_id)
+    nodes = [
+        {"id": c["id"], "label": c["name"], "category": c.get("category", ""),
+         "importance": c.get("importance", "medium"), "definition": c.get("definition", "")}
+        for c in concepts
+    ]
+    graph_edges = [
+        {"source": e["source_concept_id"], "target": e["target_concept_id"],
+         "label": e.get("relationship", ""), "strength": e.get("strength", 0.5)}
+        for e in edges
+    ]
+    return {"nodes": nodes, "edges": graph_edges}
+
+
+@app.get("/api/knowledge/search")
+async def search_knowledge(q: str = Query(""), x_client_id: str = Header("default")):
+    if not q.strip():
+        return []
+    return search_concepts(q, client_id=x_client_id)
 
 
 # --- Helper ---

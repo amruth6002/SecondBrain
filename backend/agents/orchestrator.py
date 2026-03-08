@@ -91,7 +91,7 @@ async def run_pipeline(content: str) -> ProcessingResult:
         await asyncio.sleep(1.5)
         _emit_message("Planner", "Received content. Analyzing document structure and identifying key topics...", "thinking", receiver="Self", action="THINKING")
 
-        plan = await run_planner(content)
+        plan = await run_planner(content, existing_concepts=existing_concept_names)
 
         topics_str = ", ".join(plan.topics_to_extract[:5]) if plan.topics_to_extract else "general topics"
         
@@ -114,7 +114,7 @@ async def run_pipeline(content: str) -> ProcessingResult:
         _emit_message("Retriever",
             f"Strategy map received. Scanning content for predefined topics across {len(plan.topics_to_extract)} categories...", "thinking", receiver="Planner", action="ACKNOWLEDGE")
 
-        retrieval = await run_retriever(content, plan)
+        retrieval = await run_retriever(content, plan, existing_concepts=existing_concept_names)
 
         await asyncio.sleep(1.0)
         _emit_message("Retriever",
@@ -200,6 +200,28 @@ async def run_pipeline(content: str) -> ProcessingResult:
             f"Generated {len(flashcards)} flashcards across Bloom's levels: remember, understand, apply, analyse.", "success")
         _emit_message("Executor",
             f"Built knowledge graph: {len(graph_nodes)} nodes, {len(graph_edges)} edges. Writing synthesis summary...", "info")
+        # ── OVERLAP DETECTION ──
+        existing_set = {n.lower() for n in existing_concept_names}
+        overlap_names, new_names = [], []
+        for c in retrieval.concepts:
+            if c.name.lower() in existing_set or c.source_context.startswith("OVERLAP:"):
+                overlap_names.append(c.name)
+                if c.source_context.startswith("OVERLAP:"):
+                    c.source_context = c.source_context[8:].strip()
+            else:
+                new_names.append(c.name)
+
+        overlap_info = None
+        if overlap_names:
+            overlap_info = {
+                "overlapping_concepts": overlap_names,
+                "new_concepts": new_names,
+                "message": f"Found {len(overlap_names)} concepts you already know",
+            }
+            _emit_message("System",
+                f"Overlap detected — you already know: {', '.join(overlap_names[:5])}",
+                "info", receiver="All", action="OVERLAP_DETECTED")
+
         _emit_message("System", "All agents completed successfully. Results ready.", "success")
         _update_status("executor", 100, f"Complete — {len(flashcards)} cards", executor_output=execution)
         _update_status("complete", 100, "Pipeline finished successfully!")
@@ -212,6 +234,7 @@ async def run_pipeline(content: str) -> ProcessingResult:
             graph_nodes=graph_nodes,
             graph_edges=graph_edges,
             summary=execution.summary,
+            overlap=overlap_info,
         )
 
     except Exception as e:

@@ -34,11 +34,12 @@ Respond with this exact JSON structure:
 Be thorough but focused. Identify 5-15 key topics. Learning objectives should use action verbs (explain, compare, implement, analyze)."""
 
 
-async def run_planner(content: str) -> ExtractionPlan:
+async def run_planner(content: str, existing_concepts: list[str] = None) -> ExtractionPlan:
     """Run the Planner Agent on raw content.
 
     Args:
         content: Raw text content from PDF, YouTube, or user notes
+        existing_concepts: List of concept names the student already knows
 
     Returns:
         ExtractionPlan with topics, objectives, and connections to find
@@ -48,7 +49,15 @@ async def run_planner(content: str) -> ExtractionPlan:
     if len(content) > max_chars:
         content = content[:max_chars] + "\n\n[Content truncated for analysis]"
 
-    user_message = f"Analyze the following educational content and create a Knowledge Acquisition Plan:\n\n{content}"
+    existing_note = ""
+    if existing_concepts:
+        existing_note = (
+            "\n\nIMPORTANT CONTEXT — The student already knows these concepts from previous study:\n"
+            + ", ".join(existing_concepts[:50])
+            + "\n\nFocus your plan on NEW topics not yet covered. Note any overlap with existing knowledge."
+        )
+
+    user_message = f"Analyze the following educational content and create a Knowledge Acquisition Plan:{existing_note}\n\n{content}"
 
     result = await call_llm_json(PLANNER_SYSTEM_PROMPT, user_message)
 
