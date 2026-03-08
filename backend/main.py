@@ -102,7 +102,7 @@ async def health():
 async def _run_pipeline_background(text: str, client_id: str):
     """Run pipeline in the background; persist result when done."""
     try:
-        result = await run_pipeline(text)
+        result = await run_pipeline(text, client_id=client_id)
         _results_store[f"{client_id}_latest"] = result
         _persist_result(result, client_id)
     except Exception as e:

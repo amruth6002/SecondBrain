@@ -11,6 +11,7 @@ actual LLM calls go through our robust async httpx client with retry logic.
 """
 
 import asyncio
+import traceback
 from typing import Optional
 
 from config import settings
@@ -71,7 +72,7 @@ def _update_status(
     )
 
 
-async def run_pipeline(content: str) -> ProcessingResult:
+async def run_pipeline(content: str, notebook_id: Optional[str] = None, client_id: str = "default") -> ProcessingResult:
     """
     Async multi-agent pipeline: Planner → Retriever → Executor.
     Each agent calls the LLM directly (httpx + retry) instead of AutoGen initiate_chat,
@@ -79,6 +80,18 @@ async def run_pipeline(content: str) -> ProcessingResult:
     """
     global _agent_messages
     _agent_messages.clear()
+
+    # Build existing concept names for overlap detection
+    existing_concept_names: list[str] = []
+    try:
+        from utils.database import get_all_concepts
+        all_concepts = get_all_concepts(client_id=client_id)
+        existing_concept_names = [
+            c["name"] for c in all_concepts
+            if c.get("notebook_id") != notebook_id
+        ]
+    except Exception:
+        pass  # If DB not available, proceed without overlap detection
 
     try:
         # ── STAGE 1 : PLANNER ──────────────────────────────────────────────
