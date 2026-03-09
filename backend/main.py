@@ -242,23 +242,32 @@ async def get_due_flashcards(x_client_id: str = Header("default")):
 @app.get("/api/dashboard/stats")
 async def get_dashboard_stats(x_client_id: str = Header("default")):
     """Get dashboard statistics."""
-    result = _results_store.get(f"{x_client_id}_latest")
     from datetime import datetime
     now = datetime.now().isoformat()
+
+    # Get aggregate stats from DB
+    all_concepts = get_all_concepts(client_id=x_client_id)
+    all_edges = get_all_graph_edges(client_id=x_client_id)
 
     my_cards = [c for k, c in _flashcard_store.items() if k.startswith(f"{x_client_id}_")]
     total_cards = len(my_cards)
     due_cards = len([c for c in my_cards if c.get("next_review", "") <= now])
     mastered = len([c for c in my_cards if c.get("repetitions", 0) >= 3])
 
+    # Get recent sessions for a better summary
+    recent_sessions = get_all_sessions(client_id=x_client_id)
+    summary_text = "Your knowledge base is empty. Create a notebook and process some content to build your SecondBrain!"
+    if recent_sessions:
+        summary_text = "### Recent Extractions\n\n" + "\n\n---\n\n".join([f"**{s.title}**\n{s.summary}" for s in recent_sessions[:3]])
+
     return {
-        "total_concepts": len(result.concepts) if result else 0,
+        "total_concepts": len(all_concepts),
         "total_flashcards": total_cards,
         "due_for_review": due_cards,
         "mastered": mastered,
-        "graph_nodes": len(result.graph_nodes) if result else 0,
-        "graph_edges": len(result.graph_edges) if result else 0,
-        "summary": result.summary if result else "",
+        "graph_nodes": len(all_concepts),
+        "graph_edges": len(all_edges),
+        "summary": summary_text,
     }
 
 

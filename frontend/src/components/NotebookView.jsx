@@ -192,25 +192,12 @@ export default function NotebookView({ notebookId, onToast, onRefresh }) {
 
     const hasResults = (notebook.concepts?.length > 0) || (notebook.flashcards?.length > 0);
 
-    // Pipeline view during processing
-    if (isProcessing) {
-        return (
-            <div className="notebook-processing">
-                <div className="notebook-header" style={{ marginBottom: "1rem" }}>
-                    <h2 className="notebook-name">
-                        <Icon name="pipeline" size={20} />
-                        Processing: {notebook.name}
-                    </h2>
-                </div>
-                <div className="pipeline-split">
-                    <AgentPipeline status={pipelineStatus} variant="stepper" />
-                    <AgentPipeline status={pipelineStatus} variant="feed" />
-                </div>
-            </div>
-        );
-    }
-
     const BLOCK_ICONS = { pdf: "pdf", youtube: "youtube", text: "text" };
+    const [expandedBlocks, setExpandedBlocks] = useState({});
+
+    const toggleBlockExpand = (id) => {
+        setExpandedBlocks(prev => ({ ...prev, [id]: !prev[id] }));
+    };
 
     return (
         <div className="notebook-view">
@@ -238,15 +225,32 @@ export default function NotebookView({ notebookId, onToast, onRefresh }) {
                         {hasResults && ` · ${notebook.concepts?.length || 0} concepts · ${notebook.flashcards?.length || 0} cards`}
                     </span>
                 </div>
-                <button
-                    className="btn btn-primary"
-                    onClick={handleProcess}
-                    disabled={!notebook.blocks?.length}
-                >
-                    <Icon name="pipeline" size={16} />
-                    Process with AI
-                </button>
+                {!isProcessing ? (
+                    <button
+                        className="btn btn-primary"
+                        onClick={handleProcess}
+                        disabled={!notebook.blocks?.length}
+                    >
+                        <Icon name="pipeline" size={16} />
+                        Process with AI
+                    </button>
+                ) : (
+                    <button className="btn" disabled style={{ opacity: 0.8 }}>
+                        <Icon name="loader" size={16} className="spin" />
+                        Processing...
+                    </button>
+                )}
             </div>
+
+            {/* Pipeline Processing Area */}
+            {isProcessing && (
+                <div className="notebook-processing" style={{ marginTop: "1rem", marginBottom: "2rem", padding: "1.5rem", background: "var(--bg-elevated)", borderRadius: "var(--radius-lg)", border: "1px solid var(--border)" }}>
+                    <div className="pipeline-split">
+                        <AgentPipeline status={pipelineStatus} variant="stepper" />
+                        <AgentPipeline status={pipelineStatus} variant="feed" />
+                    </div>
+                </div>
+            )}
 
             {/* Tabs */}
             <div className="notebook-tabs">
@@ -310,8 +314,19 @@ export default function NotebookView({ notebookId, onToast, onRefresh }) {
                                             {block.title || block.block_type.toUpperCase()}
                                             <span className="block-badge">{block.block_type}</span>
                                         </h4>
-                                        <p className="block-preview">
-                                            {block.content?.slice(0, 300)}{block.content?.length > 300 ? "…" : ""}
+                                        <p className="block-preview" style={{ whiteSpace: "pre-wrap", color: "var(--text-secondary)", fontSize: "0.85rem", lineHeight: "1.5", marginTop: "0.5rem" }}>
+                                            {expandedBlocks[block.id]
+                                                ? block.content
+                                                : `${block.content?.slice(0, 300)}${block.content?.length > 300 ? "…" : ""}`
+                                            }
+                                            {block.content?.length > 300 && (
+                                                <button
+                                                    onClick={() => toggleBlockExpand(block.id)}
+                                                    style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', marginLeft: '0.5rem', padding: 0 }}
+                                                >
+                                                    {expandedBlocks[block.id] ? "Show less" : "Show more"}
+                                                </button>
+                                            )}
                                         </p>
                                         <div className="block-meta">
                                             <span>{block.content ? `${block.content.length.toLocaleString()} chars` : "Empty"}</span>
