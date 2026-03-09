@@ -26,6 +26,7 @@ export default function NotebookView({ notebookId, onToast, onRefresh }) {
     const [youtubeUrl, setYoutubeUrl] = useState("");
     const [pdfFile, setPdfFile] = useState(null);
     const sseRef = useRef(null);
+    const [expandedBlocks, setExpandedBlocks] = useState({});
 
     const fetchNotebook = useCallback(async () => {
         try {
@@ -193,7 +194,6 @@ export default function NotebookView({ notebookId, onToast, onRefresh }) {
     const hasResults = (notebook.concepts?.length > 0) || (notebook.flashcards?.length > 0);
 
     const BLOCK_ICONS = { pdf: "pdf", youtube: "youtube", text: "text" };
-    const [expandedBlocks, setExpandedBlocks] = useState({});
 
     const toggleBlockExpand = (id) => {
         setExpandedBlocks(prev => ({ ...prev, [id]: !prev[id] }));
