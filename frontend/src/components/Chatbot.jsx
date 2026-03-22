@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import Icon from "./Icon";
 import { askChatbot } from "../api/client";
 
-export default function Chatbot({ notebookId = null }) {
+export default function Chatbot({ notebookId = null, variant = "floating" }) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
     { role: "assistant", content: "Hi! Ask me anything about your SecondBrain knowledge base." }
