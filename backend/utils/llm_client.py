@@ -1,4 +1,4 @@
-"""LLM client for Azure AI Foundry — direct HTTP calls to Phi-4."""
+"""LLM client for Azure OpenAI — direct HTTP calls to GPT-4.1-mini."""
 
 import json
 import httpx
@@ -11,26 +11,14 @@ async def call_llm(
     temperature: float = 0.7,
     max_tokens: int = 4000,
 ) -> str:
-    """Raw HTTP client for the Azure-deployed Phi-4 model. Retries up to 3 times on disconnect."""
+    """Raw HTTP client for Azure OpenAI GPT-4.1-mini. Retries up to 3 times on disconnect."""
     import asyncio as _aio
-    endpoint = settings.AZURE_PHI4_ENDPOINT
-    if "?" in endpoint:
-        base, params = endpoint.split("?", 1)
-    else:
-        base = endpoint
-        params = ""
 
-    if not base.rstrip("/").endswith("/chat/completions"):
-        base = base.rstrip("/") + "/chat/completions"
-
-    if "api-version" not in params:
-        params = "api-version=2024-05-01-preview" + ("&" + params if params else "")
-
-    endpoint = f"{base}?{params}" if params else base
+    endpoint = settings.chat_completions_url
 
     headers = {
         "Content-Type": "application/json",
-        "api-key": settings.AZURE_PHI4_API_KEY,
+        "api-key": settings.AZURE_OPENAI_API_KEY,
     }
 
     payload = {
@@ -40,7 +28,6 @@ async def call_llm(
         ],
         "temperature": temperature,
         "max_tokens": max_tokens,
-        "model": "Phi-4",
     }
 
     last_error = None
@@ -50,7 +37,7 @@ async def call_llm(
                 response = await client.post(endpoint, json=payload, headers=headers)
                 if response.status_code != 200:
                     error_detail = response.text
-                    raise Exception(f"LLM API error ({response.status_code}): {error_detail[:300]}")
+                    raise Exception(f"LLM API error ({response.status_code}): {error_detail[:500]}")
                 result = response.json()
                 return result["choices"][0]["message"]["content"]
         except (httpx.RemoteProtocolError, httpx.ConnectError, httpx.ReadError) as e:
@@ -69,7 +56,7 @@ async def call_llm_json(
     temperature: float = 0.3,
     max_tokens: int = 4000,
 ) -> dict:
-    """Raw JSON parser."""
+    """Call the LLM and parse response as JSON."""
     json_system = system_prompt + "\n\nIMPORTANT: Respond ONLY with valid JSON. No markdown, no code fences, no extra text."
     response_text = await call_llm(json_system, user_message, temperature, max_tokens)
 
