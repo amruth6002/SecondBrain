@@ -3,21 +3,28 @@
 import os
 from dotenv import load_dotenv
 
-# Load .env from project root
-load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
+# Load .env — search up from backend/ to find it
+_config_dir = os.path.dirname(__file__)
+for _levels in ["../../.env", "../../../.env", "../../../../.env"]:
+    _candidate = os.path.join(_config_dir, _levels)
+    if os.path.exists(_candidate):
+        load_dotenv(_candidate)
+        break
+else:
+    load_dotenv()  # Fallback: try default .env or system env vars
 
 
 class Settings:
     # Azure OpenAI — GPT-4.1-mini (Primary)
     AZURE_OPENAI_ENDPOINT: str = os.getenv("AZURE_OPENAI_ENDPOINT", "")
     AZURE_OPENAI_API_KEY: str = os.getenv("AZURE_OPENAI_API_KEY", "")
-    AZURE_OPENAI_DEPLOYMENT: str = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4.1-mini")
+    AZURE_OPENAI_DEPLOYMENT: str = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4.1")
     AZURE_OPENAI_API_VERSION: str = os.getenv("AZURE_OPENAI_API_VERSION", "2025-01-01-preview")
 
     # App settings
     MAX_UPLOAD_SIZE_MB: int = 20
     MAX_CONTENT_LENGTH: int = 50000  # max chars to send to LLM
-    MODEL_NAME: str = "GPT-4.1-mini"
+    MODEL_NAME: str = "GPT-4.1"
 
     @property
     def chat_completions_url(self) -> str:
