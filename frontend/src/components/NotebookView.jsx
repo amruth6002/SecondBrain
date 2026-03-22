@@ -4,6 +4,7 @@ import KnowledgeGraph from "./KnowledgeGraph";
 import Flashcards from "./Flashcards";
 import Concepts from "./Concepts";
 import AgentPipeline from "./AgentPipeline";
+import Chatbot from "./Chatbot";
 import {
     getNotebook, addTextBlock, addPDFBlock, addYouTubeBlock,
     deleteBlock, processNotebook, subscribePipelineStatus,
@@ -225,21 +226,26 @@ export default function NotebookView({ notebookId, onToast, onRefresh }) {
                         {hasResults && ` · ${notebook.concepts?.length || 0} concepts · ${notebook.flashcards?.length || 0} cards`}
                     </span>
                 </div>
-                {!isProcessing ? (
-                    <button
-                        className="btn btn-primary"
-                        onClick={handleProcess}
-                        disabled={!notebook.blocks?.length}
-                    >
-                        <Icon name="pipeline" size={16} />
-                        Process with AI
-                    </button>
-                ) : (
-                    <button className="btn" disabled style={{ opacity: 0.8 }}>
-                        <Icon name="loader" size={16} className="spin" />
-                        Processing...
-                    </button>
-                )}
+                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                    {hasResults && (
+                        <Chatbot notebookId={notebookId} variant="inline" />
+                    )}
+                    {!isProcessing ? (
+                        <button
+                            className="btn btn-primary"
+                            onClick={handleProcess}
+                            disabled={!notebook.blocks?.length}
+                        >
+                            <Icon name="pipeline" size={16} />
+                            Process with AI
+                        </button>
+                    ) : (
+                        <button className="btn" disabled style={{ opacity: 0.8 }}>
+                            <Icon name="loader" size={16} className="spin" />
+                            Processing...
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Pipeline Processing Area */}

@@ -538,26 +538,53 @@ async def rag_chat(req: ChatRequest, x_client_id: str = Header("default")):
         
     try:
         from utils.llm_client import get_embedding, call_llm_text
-        from utils.database import search_concepts_by_embedding
+        from utils.database import search_concepts_by_embedding, get_edges_for_concept_ids, get_all_notebooks
         
         # 1. Embed user query
         query_embedding = await get_embedding(req.query)
         
-        # 2. Search Cosmos DB for relevant concepts (cross-notebook)
-        similar_concepts = search_concepts_by_embedding(query_embedding, limit=5, client_id=x_client_id)
+        # 2. Search Cosmos DB for relevant concepts
+        similar_concepts = search_concepts_by_embedding(
+            query_embedding, 
+            limit=5, 
+            client_id=x_client_id, 
+            notebook_id=req.notebook_id
+        )
             
-        # 3. Build context
+        # 3. Fetch all notebooks for naming context
+        notebooks = get_all_notebooks(client_id=x_client_id)
+        nb_dict = {nb["id"]: nb["name"] for nb in notebooks}
+        
+        # 4. Fetch related graph edges
+        concept_ids = [c["id"] for c in similar_concepts if "id" in c]
+        edges = get_edges_for_concept_ids(concept_ids, client_id=x_client_id) if concept_ids else []
+        
+        # 5. Build context
         context_str = "No relevant concepts found in the knowledge base."
         if similar_concepts:
-            context_str = "\n\n".join(
-                f"Concept: {c['name']}\nDefinition: {c['definition']}\nSource Context: {c.get('source_context', '')}"
-                for c in similar_concepts
-            )
+            concept_strs = []
+            for c in similar_concepts:
+                nb_name = nb_dict.get(c.get("notebook_id"), "Unknown Notebook")
+                concept_strs.append(f"Concept: {c['name']} (from notebook: '{nb_name}')\nDefinition: {c['definition']}\nSource Context: {c.get('source_context', '')}")
             
-        system_prompt = f"""You are SecondBrain, an AI learning assistant.
-Answer the student's question using ONLY the provided knowledge base context. 
-Be helpful, concise, and educational.
-If the context doesn't contain the answer, say "I don't have enough extracted information in your SecondBrain to confidentally answer that."
+            edge_strs = []
+            for e in edges:
+                source_name = next((c["name"] for c in similar_concepts if c.get("id") == e["source_concept_id"]), "Unknown")
+                target_name = next((c["name"] for c in similar_concepts if c.get("id") == e["target_concept_id"]), "Unknown")
+                if source_name != "Unknown" and target_name != "Unknown":
+                    edge_strs.append(f"- {source_name} --[{e.get('relationship', 'is related to')}]--> {target_name} (Strength: {e.get('strength', 0)})")
+            
+            context_str = "CONCEPTS:\n" + "\n\n".join(concept_strs)
+            if edge_strs:
+                context_str += "\n\nRELATIONSHIPS (Graph Edges):\n" + "\n".join(edge_strs)
+            
+        system_prompt = f"""You are SecondBrain, an AI learning assistant answering a student's question.
+Use the provided knowledge base context to answer exactly and thoroughly. The context comes from various 'notebooks' created by the user. If the user asks about a specific 'notebook', refer to the concepts that came from that notebook name.
+
+CRITICAL INSTRUCTIONS:
+- You must synthesize an answer based on the concepts, definitions, and relationships provided.
+- If the knowledge base context DOES NOT contain enough relevant information to answer (even partially), reply EXACTLY with: "I don't have enough extracted information in your SecondBrain to confidentally answer that." 
+- Do NOT use outside knowledge if it's not in the context.
 
 KNOWLEDGE BASE CONTEXT:
 {context_str}

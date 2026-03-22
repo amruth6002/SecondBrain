@@ -338,9 +338,13 @@ def search_concepts(query: str, client_id: str = "default") -> list[dict]:
         result.append(d)
     return result
 
-def search_concepts_by_embedding(embedding: list[float], limit: int = 5, client_id: str = "default") -> list[dict]:
+def search_concepts_by_embedding(embedding: list[float], limit: int = 5, client_id: str = "default", notebook_id: Optional[str] = None) -> list[dict]:
     """Perform a vector search using Cosmos DB MongoDB vCore $search."""
     db = get_db()
+    match_stage = {"client_id": client_id}
+    if notebook_id:
+        match_stage["notebook_id"] = notebook_id
+        
     pipeline = [
         {
             "$search": {
@@ -354,9 +358,7 @@ def search_concepts_by_embedding(embedding: list[float], limit: int = 5, client_
             }
         },
         {
-            "$match": {
-                "client_id": client_id
-            }
+            "$match": match_stage
         },
         {
             "$project": {
@@ -408,6 +410,17 @@ def get_all_graph_edges(client_id: str = "default") -> list[dict]:
 def get_graph_edges_for_notebook(notebook_id: str, client_id: str = "default") -> list[dict]:
     db = get_db()
     cursor = db.graph_edges.find({"notebook_id": notebook_id, "client_id": client_id})
+    return [_doc_to_dict(d) for d in cursor]
+
+def get_edges_for_concept_ids(concept_ids: list[str], client_id: str = "default") -> list[dict]:
+    db = get_db()
+    cursor = db.graph_edges.find({
+        "client_id": client_id,
+        "$or": [
+            {"source_concept_id": {"$in": concept_ids}},
+            {"target_concept_id": {"$in": concept_ids}}
+        ]
+    })
     return [_doc_to_dict(d) for d in cursor]
 
 

@@ -51,49 +51,71 @@ export default function Chatbot({ notebookId = null }) {
     }
   };
 
-  return (
+  const chatContent = (
+    <div className="chatbot-window card fade-in" onClick={(e) => e.stopPropagation()}>
+      <div className="chatbot-header">
+        <div>
+          <h3>Ask SecondBrain</h3>
+          <span className="chatbot-subtitle">{notebookId ? "Searching current notebook" : "Searching all knowledge"}</span>
+        </div>
+        <button onClick={() => setIsOpen(false)} className="chatbot-close-btn" title="Close chat">
+          <Icon name="xmark" size={16} />
+        </button>
+      </div>
+      
+      <div className="chatbot-messages">
+        {messages.map((m, i) => (
+          <div key={i} className={`chat-bubble ${m.role}`}>
+            {m.content.split('\n').map((line, j) => (
+              <p key={j}>{line}</p>
+            ))}
+          </div>
+        ))}
+        {isLoading && (
+          <div className="chat-bubble assistant loading">
+            <span className="dot"></span><span className="dot"></span><span className="dot"></span>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      <form onSubmit={handleSubmit} className="chatbot-input-area">
+        <input
+          type="text"
+          placeholder="Ask a question..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          disabled={isLoading}
+          autoFocus={isOpen}
+        />
+        <button type="submit" disabled={!input.trim() || isLoading} className="btn btn-primary">
+          <Icon name="sparkles" size={14} />
+        </button>
+      </form>
+    </div>
+  );
+
+  if (variant === "inline") {
+    return (
+      <>
+        <button className="btn btn-secondary" onClick={() => setIsOpen(true)}>
+          <Icon name="sparkles" size={16} /> Chat with Notebook
+        </button>
+        {isOpen && (
+          <div className="modal-backdrop" style={{
+            position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
+            backgroundColor: "rgba(0,0,0,0.5)", zIndex: 2000,
+            display: "flex", alignItems: "center", justifyContent: "center"
+          }} onClick={() => setIsOpen(false)}>
+            {chatContent}
+          </div>
+        )}
+      </>
+    );
+  }  return (
     <div className="chatbot-widget">
       {isOpen ? (
-        <div className="chatbot-window card fade-in">
-          <div className="chatbot-header">
-            <div>
-              <h3>Ask SecondBrain</h3>
-              <span className="chatbot-subtitle">{notebookId ? "Searching current notebook" : "Searching all knowledge"}</span>
-            </div>
-            <button onClick={() => setIsOpen(false)} className="chatbot-close-btn" title="Close chat">
-              <Icon name="xmark" size={16} />
-            </button>
-          </div>
-          
-          <div className="chatbot-messages">
-            {messages.map((m, i) => (
-              <div key={i} className={`chat-bubble ${m.role}`}>
-                {m.content.split('\n').map((line, j) => (
-                  <p key={j}>{line}</p>
-                ))}
-              </div>
-            ))}
-            {isLoading && (
-              <div className="chat-bubble assistant loading">
-                <span className="dot"></span><span className="dot"></span><span className="dot"></span>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          <form onSubmit={handleSubmit} className="chatbot-input-area">
-            <input
-              type="text"
-              placeholder="Ask a question..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              disabled={isLoading}
-            />
-            <button type="submit" disabled={!input.trim() || isLoading} className="btn btn-primary">
-              <Icon name="sparkles" size={14} />
-            </button>
-          </form>
-        </div>
+        chatContent
       ) : (
         <button className="chatbot-fab bounce-in" onClick={() => setIsOpen(true)} title="Ask SecondBrain">
           <Icon name="sparkles" size={24} />
