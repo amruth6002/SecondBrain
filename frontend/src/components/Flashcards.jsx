@@ -3,10 +3,10 @@ import { reviewFlashcard } from "../api/client";
 import Icon from "./Icon";
 
 const BLOOM_COLORS = {
-    remember: { color: "#34d399", bg: "rgba(52, 211, 153, 0.12)" },
-    understand: { color: "#7c83ff", bg: "rgba(124, 131, 255, 0.12)" },
-    apply: { color: "#fbbf24", bg: "rgba(251, 191, 36, 0.12)" },
-    analyze: { color: "#fb7185", bg: "rgba(251, 113, 133, 0.12)" },
+    remember: { color: "var(--success)", bg: "var(--success-dim)" },
+    understand: { color: "var(--accent)", bg: "var(--accent-dim)" },
+    apply: { color: "var(--warning)", bg: "var(--warning-dim)" },
+    analyze: { color: "var(--error)", bg: "var(--error-dim)" },
 };
 
 const BLOOM_LEVELS = ["remember", "understand", "apply", "analyze"];

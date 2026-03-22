@@ -545,10 +545,6 @@ async def rag_chat(req: ChatRequest, x_client_id: str = Header("default")):
         
         # 2. Search Cosmos DB for relevant concepts (cross-notebook)
         similar_concepts = search_concepts_by_embedding(query_embedding, limit=5, client_id=x_client_id)
-        
-        if req.notebook_id:
-            # Optionally filter by notebook if requested
-            similar_concepts = [c for c in similar_concepts if c.get("notebook_id") == req.notebook_id]
             
         # 3. Build context
         context_str = "No relevant concepts found in the knowledge base."

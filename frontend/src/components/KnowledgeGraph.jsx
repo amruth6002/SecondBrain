@@ -88,14 +88,22 @@ export default function KnowledgeGraph({ nodes, edges }) {
     }, [nodes, edges]);
 
     const nodeCanvasObject = useCallback((node, ctx, globalScale) => {
+        const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        const LIGHT_COLORS = {
+            definition: "#4338ca", theorem: "#e11d48", process: "#059669", 
+            formula: "#d97706", example: "#7e22ce", principle: "#0891b2", default: "#4338ca"
+        };
+        
         const label = node.label || "";
         const fontSize = Math.max(11 / globalScale, 3);
         const size = IMPORTANCE_SIZE[node.importance] || 7;
-        const color = CATEGORY_COLORS[node.category] || CATEGORY_COLORS.default;
+        
+        const activeColors = isLight ? LIGHT_COLORS : CATEGORY_COLORS;
+        const color = activeColors[node.category] || activeColors.default;
 
         // Outer glow
         ctx.shadowColor = color;
-        ctx.shadowBlur = 20;
+        ctx.shadowBlur = isLight ? 10 : 20;
 
         // Node circle
         ctx.beginPath();
@@ -106,13 +114,13 @@ export default function KnowledgeGraph({ nodes, edges }) {
         ctx.shadowBlur = 0;
 
         // Subtle ring
-        ctx.strokeStyle = "rgba(255,255,255,0.15)";
+        ctx.strokeStyle = isLight ? "rgba(0,0,0,0.1)" : "rgba(124,131,255,0.4)";
         ctx.lineWidth = 0.5;
         ctx.stroke();
 
         // Label
         ctx.font = `500 ${fontSize}px Inter, sans-serif`;
-        ctx.fillStyle = "#f0f0f3";
+        ctx.fillStyle = isLight ? "#0f172a" : "#f0f0f3";
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
         ctx.fillText(label, node.x, node.y + size + 3);
@@ -124,7 +132,8 @@ export default function KnowledgeGraph({ nodes, edges }) {
             if (containerRef.current) {
                 const rect = containerRef.current.getBoundingClientRect();
                 const newWidth = Math.floor(rect.width) - 48;
-                const newHeight = Math.max(300, Math.min(450, Math.floor(newWidth * 0.6)));
+                // Subtract approximate header/footer padding from container height
+                const newHeight = Math.max(300, Math.floor(rect.height) - 150);
                 setDimensions(prev => {
                     if (Math.abs(prev.width - newWidth) > 5 || Math.abs(prev.height - newHeight) > 5) {
                         return { width: newWidth, height: newHeight };
