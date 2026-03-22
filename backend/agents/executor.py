@@ -13,6 +13,7 @@ from models.schemas import (
     Flashcard, KnowledgeGraphNode, KnowledgeGraphEdge,
 )
 
+
 EXECUTOR_SYSTEM_PROMPT = """You are the EXECUTOR AGENT in a multi-agent knowledge management system called SecondBrain.
 
 Your role is to transform extracted concepts into actionable learning materials.
