@@ -241,3 +241,13 @@ export async function getDueFlashcards() {
     if (!res.ok) throw new Error(await res.text());
     return res.json();
 }
+
+export async function askChatbot(query, notebookId = null) {
+    const res = await fetch(`${API_BASE}/api/chat`, {
+        method: "POST",
+        headers: getHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ query, notebook_id: notebookId }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}

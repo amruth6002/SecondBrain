@@ -4,6 +4,7 @@ import NotebookView from "./components/NotebookView";
 import KnowledgeGraph from "./components/KnowledgeGraph";
 import Flashcards from "./components/Flashcards";
 import Dashboard from "./components/Dashboard";
+import Chatbot from "./components/Chatbot";
 import {
   getDashboardStats,
   getNotebooks,
@@ -260,6 +261,9 @@ export default function App() {
           </div>
         ))}
       </div>
+
+      {/* Floating Chatbot */}
+      <Chatbot notebookId={view === "notebook" ? selectedNotebookId : null} />
     </div>
   );
 }
