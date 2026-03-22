@@ -16,6 +16,12 @@ class ContentInput(BaseModel):
     # PDF files are handled via multipart upload, not this model
 
 
+class ChatRequest(BaseModel):
+    """Ask a question to the SecondBrain."""
+    query: str = Field(..., description="The user's question")
+    notebook_id: Optional[str] = Field(default=None, description="Optional notebook to restrict search to")
+
+
 # --- Agent Output Models ---
 
 class ExtractionPlan(BaseModel):
@@ -37,6 +43,7 @@ class Concept(BaseModel):
     importance: str = Field(default="medium", description="low/medium/high")
     related_concepts: list[str] = Field(default_factory=list)
     source_context: str = ""
+    embedding: list[float] = Field(default_factory=list)
 
 
 class ConceptConnection(BaseModel):

@@ -9,3 +9,5 @@ yt-dlp>=2026.3.0
 requests>=2.31.0
 aiofiles==24.1.0
 httpx==0.28.1
+pymongo==4.10.1
+dnspython==2.7.0

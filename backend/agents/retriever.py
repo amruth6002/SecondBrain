@@ -51,13 +51,14 @@ Respond with this exact JSON structure:
 Extract 4-6 concepts. Each definition should be clear enough for a student to understand without the original text. Generate AT LEAST 4-6 connections — these are the edges in the knowledge graph and are critical for the visualization. Connections should be meaningful and directional, not trivial."""
 
 
-async def run_retriever(content: str, plan: ExtractionPlan, existing_concepts: list[str] = None) -> RetrievalResult:
+async def run_retriever(content: str, plan: ExtractionPlan, existing_concepts: list[str] = None, client_id: str = "default") -> RetrievalResult:
     """Run the Retriever Agent using the Planner's extraction plan.
 
     Args:
         content: Raw text content
         plan: ExtractionPlan from the Planner Agent
         existing_concepts: List of concept names the student already knows
+        client_id: The ID of the current student/client
 
     Returns:
         RetrievalResult with concepts, connections, and insights
@@ -99,6 +100,20 @@ Extract concepts and connections based on the plan above."""
             source_context=c.get("source_context", ""),
         ))
 
+    # --- Generate embeddings concurrently ---
+    from utils.llm_client import get_embedding
+    import asyncio as _aio
+    embed_tasks = []
+    for c in concepts:
+        embed_tasks.append(get_embedding(f"{c.name}: {c.definition}"))
+    
+    try:
+        embeddings = await _aio.gather(*embed_tasks)
+        for i, emb in enumerate(embeddings):
+            concepts[i].embedding = emb
+    except Exception as e:
+        print(f"Failed to generate embeddings: {e}")
+
     connections = []
     for conn in result.get("connections", []):
         connections.append(ConceptConnection(
@@ -107,6 +122,24 @@ Extract concepts and connections based on the plan above."""
             relationship=conn.get("relationship", ""),
             strength=conn.get("strength", 0.5),
         ))
+
+    # --- Cross-notebook Vector Search ---
+    from utils.database import search_concepts_by_embedding
+    for c in concepts:
+        if not c.embedding:
+            continue
+        try:
+            similar = search_concepts_by_embedding(c.embedding, limit=2, client_id=client_id)
+            for sim in similar:
+                if sim["similarity_score"] > 0.85 and sim["name"] != c.name:
+                    connections.append(ConceptConnection(
+                        from_concept=c.name,
+                        to_concept=sim["name"],
+                        relationship="Semantic link (Cross-Notebook)",
+                        strength=min(sim["similarity_score"], 1.0)
+                    ))
+        except Exception as e:
+            print(f"Vector search failed for {c.name}: {e}")
 
     return RetrievalResult(
         concepts=concepts,

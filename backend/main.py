@@ -16,7 +16,7 @@ from typing import Optional
 import os
 
 from config import settings
-from models.schemas import ContentInput, ProcessingResult, PipelineStatus, SessionSummary
+from models.schemas import ContentInput, ProcessingResult, PipelineStatus, SessionSummary, ChatRequest
 from agents.orchestrator import run_pipeline, get_current_status
 from services.pdf_service import extract_text_from_pdf
 from services.youtube_service import extract_transcript
@@ -526,6 +526,58 @@ async def search_knowledge(q: str = Query(""), x_client_id: str = Header("defaul
     if not q.strip():
         return []
     return search_concepts(q, client_id=x_client_id)
+
+
+# --- RAG Chat (Ask SecondBrain) -----------------------------------------------
+
+@app.post("/api/chat")
+async def rag_chat(req: ChatRequest, x_client_id: str = Header("default")):
+    """Ask your SecondBrain a question using vector search across all notebooks."""
+    if not req.query.strip():
+        raise HTTPException(400, "Query cannot be empty")
+        
+    try:
+        from utils.llm_client import get_embedding, call_llm_text
+        from utils.database import search_concepts_by_embedding
+        
+        # 1. Embed user query
+        query_embedding = await get_embedding(req.query)
+        
+        # 2. Search Cosmos DB for relevant concepts (cross-notebook)
+        similar_concepts = search_concepts_by_embedding(query_embedding, limit=5, client_id=x_client_id)
+        
+        if req.notebook_id:
+            # Optionally filter by notebook if requested
+            similar_concepts = [c for c in similar_concepts if c.get("notebook_id") == req.notebook_id]
+            
+        # 3. Build context
+        context_str = "No relevant concepts found in the knowledge base."
+        if similar_concepts:
+            context_str = "\n\n".join(
+                f"Concept: {c['name']}\nDefinition: {c['definition']}\nSource Context: {c.get('source_context', '')}"
+                for c in similar_concepts
+            )
+            
+        system_prompt = f"""You are SecondBrain, an AI learning assistant.
+Answer the student's question using ONLY the provided knowledge base context. 
+Be helpful, concise, and educational.
+If the context doesn't contain the answer, say "I don't have enough extracted information in your SecondBrain to confidentally answer that."
+
+KNOWLEDGE BASE CONTEXT:
+{context_str}
+"""
+        
+        # 4. Generate Answer
+        answer = await call_llm_text(system_prompt, req.query, temperature=0.3)
+        
+        return {
+            "answer": answer,
+            "sources": [{"name": c["name"], "similarity": c.get("similarity_score", 0)} for c in similar_concepts]
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(500, f"Chat error: {str(e)}")
 
 
 # --- Helper ---

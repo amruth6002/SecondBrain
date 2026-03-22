@@ -127,7 +127,7 @@ async def run_pipeline(content: str, notebook_id: Optional[str] = None, client_i
         _emit_message("Retriever",
             f"Strategy map received. Scanning content for predefined topics across {len(plan.topics_to_extract)} categories...", "thinking", receiver="Planner", action="ACKNOWLEDGE")
 
-        retrieval = await run_retriever(content, plan, existing_concepts=existing_concept_names)
+        retrieval = await run_retriever(content, plan, existing_concepts=existing_concept_names, client_id=client_id)
 
         await asyncio.sleep(1.0)
         _emit_message("Retriever",
