@@ -56,8 +56,10 @@ const DeepDive = ({ exploreState, onClearExplore, onReview, setExploreState }) =
                 {/* Concept Header */}
                 <div className="card" style={{ marginBottom: "24px", padding: "20px", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", background: "var(--bg-surface)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
-                        <h2 style={{ margin: 0, fontSize: "20px", color: "var(--primary)" }}>{activeNode?.id}</h2>
-                        <div style={{ fontSize: "12px", color: "var(--text-muted)", background: "var(--bg-tertiary)", padding: "4px 8px", borderRadius: "12px" }}>
+                        <h2 style={{ margin: 0, fontSize: "20px", color: "var(--primary)", wordBreak: "break-word" }}>
+                            {activeNode?.label || activeNode?.id || "Concept"}
+                        </h2>
+                        <div style={{ fontSize: "12px", color: "var(--text-muted)", background: "var(--bg-tertiary)", padding: "4px 8px", borderRadius: "12px", whiteSpace: "nowrap", marginLeft: "8px" }}>
                             Node {exploreState.activeIndex + 1} of {exploreState.traversalNodes.length}
                         </div>
                     </div>

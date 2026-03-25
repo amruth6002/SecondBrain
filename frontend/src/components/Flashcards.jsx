@@ -110,7 +110,16 @@ export default function Flashcards({ flashcards, exploreState, onClearExplore, o
                 )}
                 <div className="empty-state">
                     <Icon name="cards" size={48} className="empty-icon" />
-                    <p>{exploreState ? `No flashcards generated for ${exploreState.conceptName} yet.` : "Process content to generate flashcards"}</p>
+                    {exploreState ? (
+                        <p>No flashcards generated for {exploreState.conceptName} yet.</p>
+                    ) : (
+                        <>
+                            <p style={{ marginBottom: "8px" }}>🎉 All caught up! No cards due for today.</p>
+                            <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "16px" }}>
+                                Want to deep-study a specific topic? Go to <strong>Knowledge Graph</strong>, click any concept node, and press <strong>"Start Guided Mastery"</strong> to begin a focused sequenced review.
+                            </p>
+                        </>
+                    )}
                 </div>
             </div>
         );

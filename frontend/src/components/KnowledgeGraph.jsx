@@ -131,9 +131,11 @@ export default function KnowledgeGraph({ nodes = [], edges = [], onNodeExplore, 
         const updateSize = () => {
             if (containerRef.current) {
                 const rect = containerRef.current.getBoundingClientRect();
-                const newWidth = Math.floor(rect.width) - 48;
-                // Subtract approximate header/footer padding from container height
-                const newHeight = Math.max(300, Math.floor(rect.height) - 150);
+                const newWidth = Math.max(200, Math.floor(rect.width) - 48);
+                // CRITICAL: Use a FIXED height in normal mode to avoid a ResizeObserver feedback loop.
+                // When the node panel appears below the canvas it increases the container height,
+                // which would trigger ResizeObserver which makes canvas taller, which triggers again → infinite loop.
+                const newHeight = isExpanded ? Math.max(300, Math.floor(rect.height) - 100) : 340;
                 setDimensions(prev => {
                     if (Math.abs(prev.width - newWidth) > 5 || Math.abs(prev.height - newHeight) > 5) {
                         return { width: newWidth, height: newHeight };
@@ -146,7 +148,8 @@ export default function KnowledgeGraph({ nodes = [], edges = [], onNodeExplore, 
         const resizeObserver = new ResizeObserver(updateSize);
         if (containerRef.current) resizeObserver.observe(containerRef.current);
         return () => resizeObserver.disconnect();
-    }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isExpanded]);
 
     // Handle initial physics tuning and camera fit robustly
     useEffect(() => {
@@ -253,7 +256,14 @@ export default function KnowledgeGraph({ nodes = [], edges = [], onNodeExplore, 
                                 graphData={graphData}
                                 nodeCanvasObject={nodeCanvasObject}
                                 nodeCanvasObjectMode={() => "replace"}
-                                onNodeClick={(node) => setSelectedNode(node)}
+                                onNodeClick={(node) => {
+                                    if (hidePanel && onNodeExplore) {
+                                        // In embedded Guided Mastery mode: clicking node navigates to that concept
+                                        onNodeExplore(node.id, node.label);
+                                    } else {
+                                        setSelectedNode(node);
+                                    }
+                                }}
                                 linkColor={() => "rgba(124, 131, 255, 0.3)"}
                                 linkWidth={(link) => (link.strength || 0.5) * 2.5}
                                 linkDirectionalParticles={2}
@@ -307,14 +317,15 @@ export default function KnowledgeGraph({ nodes = [], edges = [], onNodeExplore, 
                                         </div>
                                     )}
                                     {onNodeExplore && (
-                                        <div style={{ marginTop: '20px', display: 'flex', gap: '8px' }}>
+                                        <div style={{ marginTop: '20px' }}>
                                             <button 
                                                 className="btn btn-primary" 
-                                                style={{ flex: 1, justifyContent: 'center' }}
+                                                style={{ width: '100%', justifyContent: 'center' }}
                                                 onClick={() => onNodeExplore(selectedNode.id, selectedNode.label)}
                                             >
-                                                <Icon name="cards" size={14} /> Flashcard Deep Dive
+                                                <Icon name="cards" size={14} /> Start Guided Mastery
                                             </button>
+                                            <p style={{ margin: '8px 0 0', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>Opens sequenced flashcard review for this concept cluster → Review tab</p>
                                         </div>
                                     )}
                                 </div>
