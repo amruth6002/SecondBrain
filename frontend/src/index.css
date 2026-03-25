@@ -1686,18 +1686,13 @@ body.has-expanded-modal .sidebar {
    Knowledge Graph Node Panel
    =========================== */
 .node-panel {
-  position: absolute;
-  bottom: 16px;
-  left: 16px;
-  width: calc(100% - 32px);
-  max-width: 350px;
+  margin-top: 16px;
+  width: 100%;
   padding: 16px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
-  background: var(--bg-elevated);
-  box-shadow: var(--shadow-lg);
-  animation: nodePanelIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
-  z-index: 10;
+  background: var(--bg-surface);
+  animation: nodePanelIn 0.2s ease-out;
   overflow-wrap: break-word;
   word-wrap: break-word;
   word-break: break-word;

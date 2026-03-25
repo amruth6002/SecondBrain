@@ -5,6 +5,7 @@ import KnowledgeGraph from "./components/KnowledgeGraph";
 import Flashcards from "./components/Flashcards";
 import Dashboard from "./components/Dashboard";
 import Chatbot from "./components/Chatbot";
+import DeepDive from "./components/DeepDive";
 import {
   getDashboardStats,
   getNotebooks,
@@ -104,16 +105,50 @@ export default function App() {
         getKnowledgeGraph()
       ]);
 
+      // Perform BFS to find all connected concepts
       const connectedIds = new Set([conceptId]);
-      globalGraph.edges.forEach(edge => {
-        const sourceId = typeof edge.source === 'object' ? edge.source.id : edge.source;
-        const targetId = typeof edge.target === 'object' ? edge.target.id : edge.target;
-        if (sourceId === conceptId) connectedIds.add(targetId);
-        if (targetId === conceptId) connectedIds.add(sourceId);
+      const queue = [conceptId];
+      
+      while (queue.length > 0) {
+        const currentId = queue.shift();
+        globalGraph.edges.forEach(edge => {
+          const sourceId = typeof edge.source === 'object' ? edge.source.id : edge.source;
+          const targetId = typeof edge.target === 'object' ? edge.target.id : edge.target;
+          
+          if (sourceId === currentId && !connectedIds.has(targetId)) {
+            connectedIds.add(targetId);
+            queue.push(targetId);
+          }
+          if (targetId === currentId && !connectedIds.has(sourceId)) {
+            connectedIds.add(sourceId);
+            queue.push(sourceId);
+          }
+        });
+      }
+
+      const clusterNodes = globalGraph.nodes.filter(n => connectedIds.has(n.id));
+      const clusterEdges = globalGraph.edges.filter(e => {
+          const sourceId = typeof e.source === 'object' ? e.source.id : e.source;
+          const targetId = typeof e.target === 'object' ? e.target.id : e.target;
+          return connectedIds.has(sourceId) && connectedIds.has(targetId);
       });
+      const clusterGraph = { nodes: clusterNodes, edges: clusterEdges };
+
+      // Make the clicked node first in traversal sequence
+      const rootNode = clusterNodes.find(n => n.id === conceptId);
+      const traversalNodes = rootNode ? [rootNode, ...clusterNodes.filter(n => n.id !== conceptId)] : clusterNodes;
 
       const filtered = allCards.filter(c => connectedIds.has(c.concept_id));
-      setExploreState({ conceptId, conceptName, cards: filtered, isExpanded: true, totalConcepts: connectedIds.size });
+      setExploreState({ 
+          conceptId, 
+          conceptName, 
+          cards: filtered, 
+          isExpanded: true, 
+          totalConcepts: connectedIds.size,
+          clusterGraph,
+          traversalNodes,
+          activeIndex: 0
+      });
       setView("review");
     } catch {
       addToast("Failed to load concept flashcards", "error");
@@ -277,11 +312,17 @@ export default function App() {
           )}
 
           {/* Review */}
-          {view === "review" && (
-            <Flashcards
-              flashcards={exploreState ? exploreState.cards : dueCards}
+          {view === "review" && exploreState && (
+            <DeepDive 
               exploreState={exploreState}
               onClearExplore={() => setExploreState(null)}
+              onReview={() => { refreshDueCards(); refreshStats(); }}
+              setExploreState={setExploreState}
+            />
+          )}
+          {view === "review" && !exploreState && (
+            <Flashcards
+              flashcards={dueCards}
               onToast={addToast}
               onUpdate={() => { refreshDueCards(); refreshStats(); }}
             />

@@ -29,7 +29,7 @@ function exportCSV(flashcards) {
     URL.revokeObjectURL(url);
 }
 
-export default function Flashcards({ flashcards, exploreState, onClearExplore, onUpdate, onToast }) {
+export default function Flashcards({ flashcards, exploreState, onClearExplore, onUpdate, onToast, isEmbedded }) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
     const [reviewing, setReviewing] = useState(false);
@@ -94,18 +94,20 @@ export default function Flashcards({ flashcards, exploreState, onClearExplore, o
 
     if (!flashcards.length) {
         return (
-            <div className="card flashcard-card" style={{ position: "relative" }}>
-                <div className="flashcard-header">
-                    <div className="card-title">
-                        <Icon name="cards" />
-                        {exploreState ? `Deep Dive: ${exploreState.conceptName}${exploreState.totalConcepts > 1 ? ` + ${exploreState.totalConcepts - 1} connections` : ""}` : "Flashcards"}
+            <div className={isEmbedded ? "" : "card flashcard-card"} style={isEmbedded ? {} : { position: "relative" }}>
+                {!isEmbedded && (
+                    <div className="flashcard-header">
+                        <div className="card-title">
+                            <Icon name="cards" />
+                            {exploreState ? `Deep Dive: ${exploreState.conceptName}${exploreState.totalConcepts > 1 ? ` + ${exploreState.totalConcepts - 1} connections` : ""}` : "Flashcards"}
+                        </div>
+                        {exploreState && (
+                            <button className="btn" onClick={onClearExplore} style={{ padding: "4px 8px", fontSize: "12px", background: "var(--bg-tertiary)", border: "1px solid var(--border)", color: "var(--text)" }}>
+                                <Icon name="xmark" size={12} /> Exit Full Review
+                            </button>
+                        )}
                     </div>
-                    {exploreState && (
-                        <button className="btn" onClick={onClearExplore} style={{ padding: "4px 8px", fontSize: "12px", background: "var(--bg-tertiary)", border: "1px solid var(--border)", color: "var(--text)" }}>
-                            <Icon name="xmark" size={12} /> Exit Full Review
-                        </button>
-                    )}
-                </div>
+                )}
                 <div className="empty-state">
                     <Icon name="cards" size={48} className="empty-icon" />
                     <p>{exploreState ? `No flashcards generated for ${exploreState.conceptName} yet.` : "Process content to generate flashcards"}</p>
@@ -116,26 +118,28 @@ export default function Flashcards({ flashcards, exploreState, onClearExplore, o
 
     if (!filtered.length) {
         return (
-            <div className="card flashcard-card" style={{ position: "relative" }}>
-                <div className="flashcard-header">
-                    <div className="card-title">
-                        <Icon name="cards" />
-                        {exploreState ? `Deep Dive: ${exploreState.conceptName}${exploreState.totalConcepts > 1 ? ` + ${exploreState.totalConcepts - 1} connections` : ""}` : "Flashcards"}
-                    </div>
-                    <div className="flashcard-header-right">
-                        {exploreState && (
-                            <button className="btn" onClick={onClearExplore} style={{ padding: "4px 8px", fontSize: "12px", background: "var(--bg-tertiary)", border: "1px solid var(--border)", color: "var(--text)" }}>
-                                <Icon name="xmark" size={12} /> Exit Deep Dive
+            <div className={isEmbedded ? "" : "card flashcard-card"} style={isEmbedded ? {} : { position: "relative" }}>
+                {!isEmbedded && (
+                    <div className="flashcard-header">
+                        <div className="card-title">
+                            <Icon name="cards" />
+                            {exploreState ? `Deep Dive: ${exploreState.conceptName}${exploreState.totalConcepts > 1 ? ` + ${exploreState.totalConcepts - 1} connections` : ""}` : "Flashcards"}
+                        </div>
+                        <div className="flashcard-header-right">
+                            {exploreState && (
+                                <button className="btn" onClick={onClearExplore} style={{ padding: "4px 8px", fontSize: "12px", background: "var(--bg-tertiary)", border: "1px solid var(--border)", color: "var(--text)" }}>
+                                    <Icon name="xmark" size={12} /> Exit Deep Dive
+                                </button>
+                            )}
+                            <button className="export-btn" onClick={() => { exportCSV(flashcards); onToast?.("Exported " + flashcards.length + " cards as CSV", "success"); }}>
+                                <Icon name="link" size={13} />CSV
                             </button>
-                        )}
-                        <button className="export-btn" onClick={() => { exportCSV(flashcards); onToast?.("Exported " + flashcards.length + " cards as CSV", "success"); }}>
-                            <Icon name="link" size={13} />CSV
-                        </button>
-                        <button className="collapse-btn" onClick={() => setIsCollapsed(!isCollapsed)} title="Toggle collapse">
-                            <Icon name={isCollapsed ? "chevron_down" : "chevron_up"} size={16} />
-                        </button>
+                            <button className="collapse-btn" onClick={() => setIsCollapsed(!isCollapsed)} title="Toggle collapse">
+                                <Icon name={isCollapsed ? "chevron_down" : "chevron_up"} size={16} />
+                            </button>
+                        </div>
                     </div>
-                </div>
+                )}
                 {!isCollapsed && (
                     <>
                         <BloomFilters active={filterBloom} onChange={setFilterBloom} flashcards={flashcards} />
@@ -161,32 +165,34 @@ export default function Flashcards({ flashcards, exploreState, onClearExplore, o
     };
 
     return (
-        <div className="card flashcard-card" style={{ position: "relative" }}>
-            <div className="flashcard-header">
-                <div className="card-title">
-                    <Icon name="cards" />
-                    {exploreState ? `Deep Dive: ${exploreState.conceptName}${exploreState.totalConcepts > 1 ? ` + ${exploreState.totalConcepts - 1} connections` : ""}` : "Flashcards"}
-                </div>
-                <div className="flashcard-header-right">
-                    {exploreState && (
-                        <button className="btn" onClick={onClearExplore} style={{ padding: "4px 8px", fontSize: "12px", background: "var(--bg-tertiary)", border: "1px solid var(--border)", color: "var(--text)" }}>
-                            <Icon name="xmark" size={12} /> Exit Deep Dive
+        <div className={isEmbedded ? "" : "card flashcard-card"} style={isEmbedded ? {} : { position: "relative" }}>
+            {!isEmbedded && (
+                <div className="flashcard-header">
+                    <div className="card-title">
+                        <Icon name="cards" />
+                        {exploreState ? `Deep Dive: ${exploreState.conceptName}${exploreState.totalConcepts > 1 ? ` + ${exploreState.totalConcepts - 1} connections` : ""}` : "Flashcards"}
+                    </div>
+                    <div className="flashcard-header-right">
+                        {exploreState && (
+                            <button className="btn" onClick={onClearExplore} style={{ padding: "4px 8px", fontSize: "12px", background: "var(--bg-tertiary)", border: "1px solid var(--border)", color: "var(--text)" }}>
+                                <Icon name="xmark" size={12} /> Exit Deep Dive
+                            </button>
+                        )}
+                        <span className="card-counter">{currentIndex + 1}/{filtered.length}</span>
+                        <button
+                            className="export-btn"
+                            title="Export as CSV"
+                            onClick={() => { exportCSV(flashcards); onToast?.("Exported " + flashcards.length + " cards as CSV", "success"); }}
+                        >
+                            <Icon name="link" size={13} />
+                            CSV
                         </button>
-                    )}
-                    <span className="card-counter">{currentIndex + 1}/{filtered.length}</span>
-                    <button
-                        className="export-btn"
-                        title="Export as CSV"
-                        onClick={() => { exportCSV(flashcards); onToast?.("Exported " + flashcards.length + " cards as CSV", "success"); }}
-                    >
-                        <Icon name="link" size={13} />
-                        CSV
-                    </button>
-                    <button className="collapse-btn" onClick={() => setIsCollapsed(!isCollapsed)} title="Toggle collapse">
-                        <Icon name={isCollapsed ? "chevron_down" : "chevron_up"} size={16} />
-                    </button>
+                        <button className="collapse-btn" onClick={() => setIsCollapsed(!isCollapsed)} title="Toggle collapse">
+                            <Icon name={isCollapsed ? "chevron_down" : "chevron_up"} size={16} />
+                        </button>
+                    </div>
                 </div>
-            </div>
+            )}
 
             {!isCollapsed && (
                 <>
