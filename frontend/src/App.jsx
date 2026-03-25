@@ -97,10 +97,23 @@ export default function App() {
 
   const handleExploreConcept = async (conceptId, conceptName) => {
     try {
-      addToast(`Deep diving into ${conceptName}...`, "info");
-      const allCards = await getAllFlashcards();
-      const filtered = allCards.filter(c => c.concept_id === conceptId);
-      setExploreState({ conceptId, conceptName, cards: filtered });
+      addToast(`Deep diving into ${conceptName} and its connections...`, "info");
+      
+      const [allCards, globalGraph] = await Promise.all([
+        getAllFlashcards(),
+        getKnowledgeGraph()
+      ]);
+
+      const connectedIds = new Set([conceptId]);
+      globalGraph.edges.forEach(edge => {
+        const sourceId = typeof edge.source === 'object' ? edge.source.id : edge.source;
+        const targetId = typeof edge.target === 'object' ? edge.target.id : edge.target;
+        if (sourceId === conceptId) connectedIds.add(targetId);
+        if (targetId === conceptId) connectedIds.add(sourceId);
+      });
+
+      const filtered = allCards.filter(c => connectedIds.has(c.concept_id));
+      setExploreState({ conceptId, conceptName, cards: filtered, isExpanded: true, totalConcepts: connectedIds.size });
       setView("review");
     } catch {
       addToast("Failed to load concept flashcards", "error");

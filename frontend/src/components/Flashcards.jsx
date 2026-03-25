@@ -98,7 +98,7 @@ export default function Flashcards({ flashcards, exploreState, onClearExplore, o
                 <div className="flashcard-header">
                     <div className="card-title">
                         <Icon name="cards" />
-                        {exploreState ? `Deep Dive: ${exploreState.conceptName}` : "Flashcards"}
+                        {exploreState ? `Deep Dive: ${exploreState.conceptName}${exploreState.totalConcepts > 1 ? ` + ${exploreState.totalConcepts - 1} connections` : ""}` : "Flashcards"}
                     </div>
                     {exploreState && (
                         <button className="btn" onClick={onClearExplore} style={{ padding: "4px 8px", fontSize: "12px", background: "var(--bg-tertiary)", border: "1px solid var(--border)", color: "var(--text)" }}>
@@ -120,7 +120,7 @@ export default function Flashcards({ flashcards, exploreState, onClearExplore, o
                 <div className="flashcard-header">
                     <div className="card-title">
                         <Icon name="cards" />
-                        {exploreState ? `Deep Dive: ${exploreState.conceptName}` : "Flashcards"}
+                        {exploreState ? `Deep Dive: ${exploreState.conceptName}${exploreState.totalConcepts > 1 ? ` + ${exploreState.totalConcepts - 1} connections` : ""}` : "Flashcards"}
                     </div>
                     <div className="flashcard-header-right">
                         {exploreState && (
@@ -165,7 +165,7 @@ export default function Flashcards({ flashcards, exploreState, onClearExplore, o
             <div className="flashcard-header">
                 <div className="card-title">
                     <Icon name="cards" />
-                    {exploreState ? `Deep Dive: ${exploreState.conceptName}` : "Flashcards"}
+                    {exploreState ? `Deep Dive: ${exploreState.conceptName}${exploreState.totalConcepts > 1 ? ` + ${exploreState.totalConcepts - 1} connections` : ""}` : "Flashcards"}
                 </div>
                 <div className="flashcard-header-right">
                     {exploreState && (
