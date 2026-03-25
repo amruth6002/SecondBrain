@@ -11,3 +11,4 @@ aiofiles==24.1.0
 httpx==0.28.1
 pymongo==4.10.1
 dnspython==2.7.0
+curl_cffi>=0.5.10

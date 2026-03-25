@@ -199,6 +199,7 @@ def _strategy_ytdlp_subprocess(video_id: str) -> str | None:
             "--write-auto-sub", "--write-sub", 
             "--sub-langs", "en,en-US,en-GB", 
             "--sub-format", "vtt/srv1/json3/srt",
+            "--impersonate", "chrome",
             "-o", os.path.join(tmpdir, "%(id)s.%(ext)s"),
             url
         ]
