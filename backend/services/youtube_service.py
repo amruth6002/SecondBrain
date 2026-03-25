@@ -58,28 +58,26 @@ def extract_transcript(youtube_url: str) -> str:
         if text:
             print(f"[YT] Success with page scrape")
             return text
+        else:
+            errors.append("page-scrape: returned None")
     except Exception as e:
         errors.append(f"page-scrape: {e}")
 
-    # ── Strategy 3+: yt-dlp with various cookie sources ──
-    for label, opts in _build_ytdlp_strategies():
-        try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(youtube_url, download=False)
-            text = _extract_subs_from_ytdlp_info(info, video_id)
-            if text:
-                print(f"[YT] Success with {label}")
-                return text
-        except Exception as e:
-            err_str = str(e).lower()
-            # Don't log expected browser-not-found noise
-            if "cookie" not in err_str and "browser" not in err_str:
-                errors.append(f"{label}: {e}")
+    # ── Strategy 3: Subprocess yt-dlp (most bulletproof) ──
+    try:
+        text = _strategy_ytdlp_subprocess(video_id)
+        if text:
+            print("[YT] Success with yt-dlp subprocess")
+            return text
+        else:
+            errors.append("yt-dlp subprocess: returned None or empty")
+    except Exception as e:
+        errors.append(f"yt-dlp subprocess: {e}")
 
     raise ValueError(
         f"Could not get transcript for video {video_id}. "
-        f"Tried {2 + len(_build_ytdlp_strategies())} strategies. "
-        f"Errors: {'; '.join(errors[-3:])}"  # Last 3 errors
+        f"All strategies failed. "
+        f"Errors: {'; '.join(errors)}"
     )
 
 
@@ -96,12 +94,13 @@ def _strategy_yt_transcript_api(video_id: str) -> str | None:
                 transcript = ytt.fetch(video_id, languages=langs)
             else:
                 transcript = ytt.fetch(video_id)
-            text = " ".join(snippet.text for snippet in transcript)
-            if text.strip():
-                return text
+            if transcript:
+                text = " ".join(snippet.text for snippet in transcript)
+                if text.strip():
+                    return text
         except Exception:
             continue
-    return None
+    raise Exception("YouTubeTranscriptApi.fetch returned None or raised error for all language fallbacks")
 
 
 # ---------------------------------------------------------------------------
@@ -184,61 +183,64 @@ def _strategy_page_scrape(video_id: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# Strategy 3+: yt-dlp variants
+# Strategy 3: yt-dlp CLI dump
 # ---------------------------------------------------------------------------
 
-def _build_ytdlp_strategies() -> list[tuple[str, dict]]:
-    base = {
-        "skip_download": True,
-        "writesubtitles": True,
-        "writeautomaticsub": True,
-        "subtitleslangs": ["en", "en-US", "en-GB"],
-        "quiet": True,
-        "no_warnings": True,
-    }
-    strategies: list[tuple[str, dict]] = []
-
-    # Browser cookies (local dev)
-    for browser in ("firefox", "chrome", "chromium"):
-        opts = {**base, "cookiesfrombrowser": (browser,)}
-        strategies.append((f"yt-dlp + {browser} cookies", opts))
-
-    # Cookies file (server / Docker)
-    cookies_file = os.environ.get("YOUTUBE_COOKIES_FILE", "")
-    if cookies_file and os.path.isfile(cookies_file):
-        opts = {**base, "cookiefile": cookies_file}
-        strategies.append(("yt-dlp + cookies file", opts))
-
-    # Plain (no auth)
-    strategies.append(("yt-dlp (no auth)", dict(base)))
-    return strategies
-
-
-def _extract_subs_from_ytdlp_info(info: dict, video_id: str) -> str | None:
-    subs = info.get("subtitles", {})
-    auto_subs = info.get("automatic_captions", {})
-
-    en_subs = None
-    for lang in ("en", "en-US", "en-GB"):
-        en_subs = subs.get(lang) or auto_subs.get(lang)
-        if en_subs:
-            break
-    if not en_subs:
-        return None
-
-    urls_by_format: dict[str, str] = {}
-    for fmt in en_subs:
-        urls_by_format[fmt["ext"]] = fmt["url"]
-
-    for ext in ("json3", "srt", "vtt"):
-        url = urls_by_format.get(ext)
-        if not url:
-            continue
-        if ext == "json3":
-            return _parse_json3_url(url, video_id)
+def _strategy_ytdlp_subprocess(video_id: str) -> str | None:
+    """Uses the raw yt-dlp command line tool to dynamically fetch subtitle JSON."""
+    import subprocess
+    import tempfile
+    
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Request vtt subtitles in English, save to our temp dir
+        url = f"https://www.youtube.com/watch?v={video_id}"
+        cmd = [
+            "yt-dlp", "--skip-download", 
+            "--write-auto-sub", "--write-sub", 
+            "--sub-langs", "en,en-US,en-GB", 
+            "--sub-format", "vtt/srv1/json3/srt",
+            "-o", os.path.join(tmpdir, "%(id)s.%(ext)s"),
+            url
+        ]
+        
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode != 0:
+            if "not a bot" in proc.stderr.lower() or "bot" in proc.stderr.lower():
+                raise Exception("yt-dlp blocked by YouTube anti-bot captcha")
+            # Usually fails if video doesn't exist, etc.
+        
+        # Check what files were downloaded
+        files = os.listdir(tmpdir)
+        sub_file = None
+        for f in files:
+            if f.startswith(video_id) and any(f.endswith(ext) for ext in [".vtt", ".srt", ".srv1", ".json3"]):
+                sub_file = os.path.join(tmpdir, f)
+                break
+                
+        if not sub_file:
+            return None
+            
+        with open(sub_file, "r", encoding="utf-8") as f:
+            raw = f.read()
+            
+        if sub_file.endswith(".json3"):
+            return _parse_json3_text(raw, video_id)
+        elif sub_file.endswith(".srv1"):
+            # Simple XML parse
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(raw)
+            return " ".join([html_module.unescape(e.text) for e in root.findall(".//text") if e.text])
         else:
-            return _parse_text_subs_url(url, video_id)
-    return None
+            # Parse VTT/SRT using our custom text parser
+            # We must pass the raw data directly to something that strips VTT headers/timestamps
+            lines = []
+            for line in raw.splitlines():
+                line = line.strip()
+                if not line or line.startswith("WEBVTT") or line.startswith("Kind:") or line.startswith("Language:"): continue
+                if re.match(r"^\d+$", line) or re.match(r"[\d:.,\-\s>]+$", line): continue
+                line = re.sub(r"<[^>]+>", "", line)
+                if line: lines.append(line)
+            return " ".join(lines)
 
 
 # ---------------------------------------------------------------------------
