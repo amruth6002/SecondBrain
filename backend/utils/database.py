@@ -139,6 +139,11 @@ def get_all_flashcards_from_db(client_id: str = "default") -> list[dict]:
     db = get_db()
     return [_doc_to_dict(d) for d in db.flashcards.find({"client_id": client_id})]
 
+def get_flashcard(card_id: str, client_id: str = "default") -> dict | None:
+    db = get_db()
+    doc = db.flashcards.find_one({"id": card_id, "client_id": client_id})
+    return _doc_to_dict(doc) if doc else None
+
 def update_flashcard_sm2(
     card_id: str,
     easiness_factor: float,

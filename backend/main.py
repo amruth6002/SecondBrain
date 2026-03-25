@@ -24,7 +24,7 @@ from utils.spaced_repetition import calculate_next_review
 from utils.database import (
     init_db, save_session, get_all_sessions, get_session_result_json,
     get_latest_session_result_json, save_flashcard, get_all_flashcards_from_db,
-    update_flashcard_sm2, delete_session,
+    get_flashcard, update_flashcard_sm2, delete_session,
     create_notebook, get_all_notebooks, get_notebook as db_get_notebook,
     rename_notebook, delete_notebook,
     add_block as db_add_block, get_blocks, delete_block as db_delete_block,
@@ -39,9 +39,6 @@ from utils.database import (
 async def lifespan(app: FastAPI):
     """Initialize DB and restore last session into memory on startup."""
     init_db()
-    # Restore all flashcards into in-memory store
-    for card in get_all_flashcards_from_db():
-        _flashcard_store[card["id"]] = card
     # Restore latest result
     latest_json = get_latest_session_result_json()
     if latest_json:
@@ -193,11 +190,9 @@ async def get_latest_results(x_client_id: str = Header("default")):
 @app.post("/api/flashcards/{card_id}/review")
 async def review_flashcard(card_id: str, quality: int = 3, x_client_id: str = Header("default")):
     """Submit a flashcard review and update spaced repetition schedule."""
-    mem_key = f"{x_client_id}_{card_id}"
-    if mem_key not in _flashcard_store:
+    card = get_flashcard(card_id, client_id=x_client_id)
+    if not card:
         raise HTTPException(404, f"Flashcard {card_id} not found")
-
-    card = _flashcard_store[mem_key]
 
     updated = calculate_next_review(
         quality=quality,
@@ -207,7 +202,6 @@ async def review_flashcard(card_id: str, quality: int = 3, x_client_id: str = He
     )
 
     card.update(updated)
-    _flashcard_store[mem_key] = card
 
     # Persist SM-2 update to SQLite
     update_flashcard_sm2(
@@ -225,7 +219,7 @@ async def review_flashcard(card_id: str, quality: int = 3, x_client_id: str = He
 @app.get("/api/flashcards")
 async def get_flashcards(x_client_id: str = Header("default")):
     """Get all flashcards."""
-    return [c for k, c in _flashcard_store.items() if k.startswith(f"{x_client_id}_")]
+    return get_all_flashcards_from_db(client_id=x_client_id)
 
 
 @app.get("/api/flashcards/due")
@@ -233,7 +227,8 @@ async def get_due_flashcards(x_client_id: str = Header("default")):
     """Get flashcards due for review."""
     from datetime import datetime
     now = datetime.now().isoformat()
-    due = [c for k, c in _flashcard_store.items() if k.startswith(f"{x_client_id}_") and c.get("next_review", "") <= now]
+    all_cards = get_all_flashcards_from_db(client_id=x_client_id)
+    due = [c for c in all_cards if c.get("next_review", "") <= now]
     return due
 
 
@@ -249,7 +244,7 @@ async def get_dashboard_stats(x_client_id: str = Header("default")):
     all_concepts = get_all_concepts(client_id=x_client_id)
     all_edges = get_all_graph_edges(client_id=x_client_id)
 
-    my_cards = [c for k, c in _flashcard_store.items() if k.startswith(f"{x_client_id}_")]
+    my_cards = get_all_flashcards_from_db(client_id=x_client_id)
     total_cards = len(my_cards)
     due_cards = len([c for c in my_cards if c.get("next_review", "") <= now])
     mastered = len([c for c in my_cards if c.get("repetitions", 0) >= 3])

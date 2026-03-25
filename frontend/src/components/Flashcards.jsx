@@ -29,7 +29,7 @@ function exportCSV(flashcards) {
     URL.revokeObjectURL(url);
 }
 
-export default function Flashcards({ flashcards, onUpdate, onToast }) {
+export default function Flashcards({ flashcards, exploreState, onClearExplore, onUpdate, onToast }) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
     const [reviewing, setReviewing] = useState(false);
@@ -94,14 +94,21 @@ export default function Flashcards({ flashcards, onUpdate, onToast }) {
 
     if (!flashcards.length) {
         return (
-            <div className="card flashcard-card">
-                <div className="card-title">
-                    <Icon name="cards" />
-                    Flashcards
+            <div className="card flashcard-card" style={{ position: "relative" }}>
+                <div className="flashcard-header">
+                    <div className="card-title">
+                        <Icon name="cards" />
+                        {exploreState ? `Deep Dive: ${exploreState.conceptName}` : "Flashcards"}
+                    </div>
+                    {exploreState && (
+                        <button className="btn" onClick={onClearExplore} style={{ padding: "4px 8px", fontSize: "12px", background: "var(--bg-tertiary)", border: "1px solid var(--border)" }}>
+                            <Icon name="xmark" size={12} /> Exit Full Review
+                        </button>
+                    )}
                 </div>
                 <div className="empty-state">
                     <Icon name="cards" size={48} className="empty-icon" />
-                    <p>Process content to generate flashcards</p>
+                    <p>{exploreState ? `No flashcards generated for ${exploreState.conceptName} yet.` : "Process content to generate flashcards"}</p>
                 </div>
             </div>
         );
@@ -109,10 +116,18 @@ export default function Flashcards({ flashcards, onUpdate, onToast }) {
 
     if (!filtered.length) {
         return (
-            <div className="card flashcard-card">
+            <div className="card flashcard-card" style={{ position: "relative" }}>
                 <div className="flashcard-header">
-                    <div className="card-title"><Icon name="cards" />Flashcards</div>
+                    <div className="card-title">
+                        <Icon name="cards" />
+                        {exploreState ? `Deep Dive: ${exploreState.conceptName}` : "Flashcards"}
+                    </div>
                     <div className="flashcard-header-right">
+                        {exploreState && (
+                            <button className="btn" onClick={onClearExplore} style={{ padding: "4px 8px", fontSize: "12px", background: "var(--bg-tertiary)", border: "1px solid var(--border)" }}>
+                                <Icon name="xmark" size={12} /> Exit Deep Dive
+                            </button>
+                        )}
                         <button className="export-btn" onClick={() => { exportCSV(flashcards); onToast?.("Exported " + flashcards.length + " cards as CSV", "success"); }}>
                             <Icon name="link" size={13} />CSV
                         </button>
@@ -146,13 +161,18 @@ export default function Flashcards({ flashcards, onUpdate, onToast }) {
     };
 
     return (
-        <div className="card flashcard-card">
+        <div className="card flashcard-card" style={{ position: "relative" }}>
             <div className="flashcard-header">
                 <div className="card-title">
                     <Icon name="cards" />
-                    Flashcards
+                    {exploreState ? `Deep Dive: ${exploreState.conceptName}` : "Flashcards"}
                 </div>
                 <div className="flashcard-header-right">
+                    {exploreState && (
+                        <button className="btn" onClick={onClearExplore} style={{ padding: "4px 8px", fontSize: "12px", background: "var(--bg-tertiary)", border: "1px solid var(--border)" }}>
+                            <Icon name="xmark" size={12} /> Exit Deep Dive
+                        </button>
+                    )}
                     <span className="card-counter">{currentIndex + 1}/{filtered.length}</span>
                     <button
                         className="export-btn"

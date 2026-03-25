@@ -12,6 +12,7 @@ import {
   deleteNotebook,
   getKnowledgeGraph,
   getDueFlashcards,
+  getAllFlashcards,
 } from "./api/client";
 import "./index.css";
 
@@ -29,6 +30,7 @@ export default function App() {
   const [stats, setStats] = useState({});
   const [graphData, setGraphData] = useState({ nodes: [], edges: [] });
   const [dueCards, setDueCards] = useState([]);
+  const [exploreState, setExploreState] = useState(null);
   const [toasts, setToasts] = useState([]);
 
   const refreshNotebooks = useCallback(async () => {
@@ -75,7 +77,7 @@ export default function App() {
     } catch { addToast("Failed to create notebook", "error"); }
   };
 
-  const handleSelectNotebook = (nbId) => {
+  const handleSidebarClick = (nbId) => {
     setSelectedNotebookId(nbId);
     setView("notebook");
   };
@@ -93,9 +95,22 @@ export default function App() {
     } catch { addToast("Failed to delete notebook", "error"); }
   };
 
+  const handleExploreConcept = async (conceptId, conceptName) => {
+    try {
+      addToast(`Deep diving into ${conceptName}...`, "info");
+      const allCards = await getAllFlashcards();
+      const filtered = allCards.filter(c => c.concept_id === conceptId);
+      setExploreState({ conceptId, conceptName, cards: filtered });
+      setView("review");
+    } catch {
+      addToast("Failed to load concept flashcards", "error");
+    }
+  };
+
   const handleNavClick = (navId) => {
     setView(navId);
     setSelectedNotebookId(null);
+    setExploreState(null); // Clear explore state on nav change
     if (navId === "graph") refreshGraph();
     if (navId === "review") refreshDueCards();
     if (navId === "dashboard") refreshStats();
@@ -153,7 +168,7 @@ export default function App() {
                 >
                   <button
                     className="notebook-load-area"
-                    onClick={() => handleSelectNotebook(nb.id)}
+                    onClick={() => handleSidebarClick(nb.id)}
                     title={nb.name}
                   >
                     <Icon name="book" size={13} className="notebook-icon" />
@@ -209,7 +224,12 @@ export default function App() {
           {/* Dashboard */}
           {view === "dashboard" && (
             <div className="results-layout">
-              <Dashboard stats={stats} summary={stats.summary || ""} />
+              <Dashboard 
+                stats={stats} 
+                summary={stats.summary || ""} 
+                notebooks={notebooks} 
+                onNotebookClick={handleSidebarClick} 
+              />
               {notebooks.length === 0 && (
                 <div className="card">
                   <div className="empty-state">
@@ -230,18 +250,25 @@ export default function App() {
               notebookId={selectedNotebookId}
               onToast={addToast}
               onRefresh={() => { refreshNotebooks(); refreshStats(); }}
+              onNodeExplore={handleExploreConcept}
             />
           )}
 
           {/* Knowledge Graph */}
           {view === "graph" && (
-            <KnowledgeGraph nodes={graphData.nodes || []} edges={graphData.edges || []} />
+            <KnowledgeGraph 
+              nodes={graphData.nodes || []} 
+              edges={graphData.edges || []} 
+              onNodeExplore={handleExploreConcept}
+            />
           )}
 
           {/* Review */}
           {view === "review" && (
             <Flashcards
-              flashcards={dueCards}
+              flashcards={exploreState ? exploreState.cards : dueCards}
+              exploreState={exploreState}
+              onClearExplore={() => setExploreState(null)}
               onToast={addToast}
               onUpdate={() => { refreshDueCards(); refreshStats(); }}
             />

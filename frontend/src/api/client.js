@@ -242,6 +242,12 @@ export async function getDueFlashcards() {
     return res.json();
 }
 
+export async function getAllFlashcards() {
+    const res = await fetch(`${API_BASE}/api/flashcards`, { headers: getHeaders() });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}
+
 export async function askChatbot(query, notebookId = null) {
     const res = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",

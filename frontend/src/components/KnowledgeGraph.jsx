@@ -19,7 +19,7 @@ const IMPORTANCE_SIZE = {
     low: 5,
 };
 
-export default function KnowledgeGraph({ nodes, edges }) {
+export default function KnowledgeGraph({ nodes = [], edges = [], onNodeExplore }) {
     const graphRef = useRef();
     const containerRef = useRef();
     const [dimensions, setDimensions] = useState({ width: 500, height: 340 });
@@ -304,6 +304,17 @@ export default function KnowledgeGraph({ nodes, edges }) {
                                                     <span className="node-connection-target">{c.label}</span>
                                                 </div>
                                             ))}
+                                        </div>
+                                    )}
+                                    {onNodeExplore && (
+                                        <div style={{ marginTop: '20px', display: 'flex', gap: '8px' }}>
+                                            <button 
+                                                className="btn btn-primary" 
+                                                style={{ flex: 1, justifyContent: 'center' }}
+                                                onClick={() => onNodeExplore(selectedNode.id, selectedNode.label)}
+                                            >
+                                                <Icon name="cards" size={14} /> Flashcard Deep Dive
+                                            </button>
                                         </div>
                                     )}
                                 </div>
