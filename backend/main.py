@@ -203,7 +203,10 @@ async def review_flashcard(card_id: str, quality: int = 3, x_client_id: str = He
 
     card.update(updated)
 
-    # Persist SM-2 update to SQLite
+    # A card is considered "mastered" when the user rates it Easy (quality >= 4)
+    is_mastered = quality >= 4
+
+    # Persist SM-2 update to database
     update_flashcard_sm2(
         card_id=card_id,
         easiness_factor=updated["easiness_factor"],
@@ -211,9 +214,10 @@ async def review_flashcard(card_id: str, quality: int = 3, x_client_id: str = He
         repetitions=updated["repetitions"],
         next_review=updated["next_review"],
         client_id=x_client_id,
+        mastered=is_mastered,
     )
 
-    return {"card_id": card_id, **updated}
+    return {"card_id": card_id, **updated, "mastered": is_mastered}
 
 
 @app.get("/api/flashcards")
@@ -247,7 +251,7 @@ async def get_dashboard_stats(x_client_id: str = Header("default")):
     my_cards = get_all_flashcards_from_db(client_id=x_client_id)
     total_cards = len(my_cards)
     due_cards = len([c for c in my_cards if c.get("next_review", "") <= now])
-    mastered = len([c for c in my_cards if c.get("repetitions", 0) >= 3])
+    mastered = len([c for c in my_cards if c.get("mastered", False)])
 
     # Get recent sessions for a better summary
     recent_sessions = get_all_sessions(client_id=x_client_id)

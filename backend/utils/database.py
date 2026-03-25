@@ -150,17 +150,22 @@ def update_flashcard_sm2(
     interval: int,
     repetitions: int,
     next_review: str,
-    client_id: str = "default"
+    client_id: str = "default",
+    mastered: bool = False,
 ):
     db = get_db()
+    update_fields = {
+        "easiness_factor": easiness_factor,
+        "interval": interval,
+        "repetitions": repetitions,
+        "next_review": next_review,
+    }
+    # Only write mastered=True; never flip back to False on a hard review
+    if mastered:
+        update_fields["mastered"] = True
     db.flashcards.update_one(
         {"id": card_id, "client_id": client_id},
-        {"$set": {
-            "easiness_factor": easiness_factor,
-            "interval": interval,
-            "repetitions": repetitions,
-            "next_review": next_review
-        }}
+        {"$set": update_fields}
     )
 
 
