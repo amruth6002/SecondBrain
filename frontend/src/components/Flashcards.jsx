@@ -101,7 +101,7 @@ export default function Flashcards({ flashcards, exploreState, onClearExplore, o
                         {exploreState ? `Deep Dive: ${exploreState.conceptName}` : "Flashcards"}
                     </div>
                     {exploreState && (
-                        <button className="btn" onClick={onClearExplore} style={{ padding: "4px 8px", fontSize: "12px", background: "var(--bg-tertiary)", border: "1px solid var(--border)" }}>
+                        <button className="btn" onClick={onClearExplore} style={{ padding: "4px 8px", fontSize: "12px", background: "var(--bg-tertiary)", border: "1px solid var(--border)", color: "var(--text)" }}>
                             <Icon name="xmark" size={12} /> Exit Full Review
                         </button>
                     )}
@@ -124,7 +124,7 @@ export default function Flashcards({ flashcards, exploreState, onClearExplore, o
                     </div>
                     <div className="flashcard-header-right">
                         {exploreState && (
-                            <button className="btn" onClick={onClearExplore} style={{ padding: "4px 8px", fontSize: "12px", background: "var(--bg-tertiary)", border: "1px solid var(--border)" }}>
+                            <button className="btn" onClick={onClearExplore} style={{ padding: "4px 8px", fontSize: "12px", background: "var(--bg-tertiary)", border: "1px solid var(--border)", color: "var(--text)" }}>
                                 <Icon name="xmark" size={12} /> Exit Deep Dive
                             </button>
                         )}
@@ -169,7 +169,7 @@ export default function Flashcards({ flashcards, exploreState, onClearExplore, o
                 </div>
                 <div className="flashcard-header-right">
                     {exploreState && (
-                        <button className="btn" onClick={onClearExplore} style={{ padding: "4px 8px", fontSize: "12px", background: "var(--bg-tertiary)", border: "1px solid var(--border)" }}>
+                        <button className="btn" onClick={onClearExplore} style={{ padding: "4px 8px", fontSize: "12px", background: "var(--bg-tertiary)", border: "1px solid var(--border)", color: "var(--text)" }}>
                             <Icon name="xmark" size={12} /> Exit Deep Dive
                         </button>
                     )}

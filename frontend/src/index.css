@@ -1711,6 +1711,9 @@ body.has-expanded-modal .sidebar {
   max-height: 200px;
   overflow-y: auto;
   padding-right: 4px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 @keyframes nodePanelIn {
@@ -2247,7 +2250,7 @@ body.has-expanded-modal .sidebar {
 .flashcard-header-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .export-btn {
@@ -2514,6 +2517,9 @@ body.has-expanded-modal .sidebar {
   margin: 8px 0 0 0;
   padding-top: 8px;
   border-top: 1px solid var(--border);
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* ===========================
@@ -2744,13 +2750,16 @@ body.has-expanded-modal .sidebar {
 }
 
 /* --- Tabs --- */
-.notebook-tabs {
-  display: flex;
-  gap: 2px;
-  background: var(--bg-surface);
+.node-connection-target {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px 6px;
+  background: var(--bg-tertiary);
   border-radius: var(--radius-sm);
-  padding: 3px;
-  overflow-x: auto;
+  max-width: 140px;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.4;
 }
 
 .tab-btn {
