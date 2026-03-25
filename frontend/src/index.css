@@ -292,6 +292,7 @@ body {
   flex: 1;
   margin-left: var(--sidebar-width);
   min-height: 100vh;
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
@@ -331,6 +332,7 @@ body {
 .content-area {
   padding: 32px 40px;
   flex: 1;
+  min-width: 0;
   animation: fadeInUp 0.4s var(--ease) both;
 }
 
@@ -1193,6 +1195,10 @@ body.has-expanded-modal .app-shell,
 body.has-expanded-modal .main-content {
   transform: none !important;
   animation: none !important;
+}
+
+body.has-expanded-modal .sidebar {
+  z-index: 0 !important;
 }
 
 .graph-controls {
