@@ -180,10 +180,21 @@ export default function KnowledgeGraph({ nodes, edges }) {
             } else {
                 document.body.classList.remove("has-expanded-modal");
             }
-            // Re-fit camera after CSS transition completes
+            
+            // Manual trigger to force recalculation of dimensions
             setTimeout(() => {
+                const updateSize = () => {
+                    if (containerRef.current) {
+                        const rect = containerRef.current.getBoundingClientRect();
+                        const newWidth = Math.floor(rect.width) - 48;
+                        const newHeight = next ? (window.innerHeight - 200) : 340; 
+                        setDimensions({ width: newWidth, height: newHeight });
+                    }
+                };
+                updateSize();
                 if (graphRef.current) graphRef.current.zoomToFit(400, 40);
-            }, 300);
+            }, 50);
+
             return next;
         });
     };
