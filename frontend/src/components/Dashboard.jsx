@@ -9,6 +9,12 @@ export default function Dashboard({ stats, summary, notebooks = [], onNotebookCl
         { icon: "graph", label: "Graph Nodes", value: stats.graph_nodes || 0, color: "#a78bfa", bg: "rgba(167, 139, 250, 0.12)" },
         { icon: "link", label: "Connections", value: stats.graph_edges || 0, color: "#22d3ee", bg: "rgba(34, 211, 238, 0.12)" },
     ];
+    // Helper text mappings to explain metrics to the user
+    const descriptions = {
+        "Cards pending review based on your Spaced Repetition schedule": "Due Today",
+        "Cards pushed 7+ days into the future or marked 'Analyze'": "Mastered",
+        "Total concepts extracted across all notebooks": "Concepts"
+    };
 
     return (
         <div className="card dashboard-card">
@@ -20,7 +26,7 @@ export default function Dashboard({ stats, summary, notebooks = [], onNotebookCl
 
             <div className="stat-grid">
                 {statCards.map((s) => (
-                    <div key={s.label} className="stat-item">
+                    <div key={s.label} className="stat-item" style={{ display: "flex", flexDirection: "column" }}>
                         <div
                             className="stat-icon-wrapper"
                             style={{ background: s.bg }}
@@ -31,19 +37,12 @@ export default function Dashboard({ stats, summary, notebooks = [], onNotebookCl
                             {s.value}
                         </span>
                         <span className="stat-label">{s.label}</span>
+                        {/* Subtitles for specific complex metrics */}
+                        {s.label === "Due Today" && <span style={{fontSize: "10px", color: "var(--text-muted)", marginTop: "4px", textAlign: "center"}}>Ready for Spaced Repetition review</span>}
+                        {s.label === "Mastered" && <span style={{fontSize: "10px", color: "var(--text-muted)", marginTop: "4px", textAlign: "center"}}>Hit 'Easy' during review to increase</span>}
                     </div>
                 ))}
             </div>
-
-            {summary && (
-                <div className="summary-section">
-                    <h3 className="summary-heading">
-                        <Icon name="summary" size={16} />
-                        Content Summary
-                    </h3>
-                    <p className="summary-text">{summary}</p>
-                </div>
-            )}
 
             {notebooks && notebooks.length > 0 && (
                 <div className="summary-section" style={{ marginTop: '24px' }}>

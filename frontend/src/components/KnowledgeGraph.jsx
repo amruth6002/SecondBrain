@@ -19,7 +19,7 @@ const IMPORTANCE_SIZE = {
     low: 5,
 };
 
-export default function KnowledgeGraph({ nodes = [], edges = [], onNodeExplore }) {
+export default function KnowledgeGraph({ nodes = [], edges = [], onNodeExplore, hidePanel }) {
     const graphRef = useRef();
     const containerRef = useRef();
     const [dimensions, setDimensions] = useState({ width: 500, height: 340 });
@@ -267,7 +267,7 @@ export default function KnowledgeGraph({ nodes = [], edges = [], onNodeExplore }
                         </div>
 
                         {/* Node Detail Panel */}
-                        {selectedNode && (() => {
+                        {selectedNode && !hidePanel && (() => {
                             const connected = edges
                                 .filter(e => e.source === selectedNode.id || e.target === selectedNode.id)
                                 .map(e => ({

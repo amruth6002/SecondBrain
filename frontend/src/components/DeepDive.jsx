@@ -22,8 +22,8 @@ const DeepDive = ({ exploreState, onClearExplore, onReview, setExploreState }) =
         }
     };
 
-    const handleNodeClick = (node) => {
-        const idx = exploreState.traversalNodes.findIndex(n => n.id === node.id);
+    const handleNodeClick = (nodeId, nodeName) => {
+        const idx = exploreState.traversalNodes.findIndex(n => n.id === nodeId);
         if (idx !== -1) {
             setExploreState(prev => ({ ...prev, activeIndex: idx }));
         }
@@ -42,8 +42,9 @@ const DeepDive = ({ exploreState, onClearExplore, onReview, setExploreState }) =
                 </div>
                 <div style={{ flex: 1, position: "relative" }}>
                     <KnowledgeGraph 
-                        graphData={exploreState.clusterGraph} 
-                        onNodeClick={handleNodeClick}
+                        nodes={exploreState.clusterGraph.nodes}
+                        edges={exploreState.clusterGraph.edges}
+                        onNodeExplore={handleNodeClick}
                         hidePanel={true}
                     />
                 </div>

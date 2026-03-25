@@ -242,7 +242,7 @@ export default function Flashcards({ flashcards, exploreState, onClearExplore, o
                                 <kbd>2</kbd> Medium
                             </button>
                             <button className="btn-review easy" onClick={() => handleReview(5)} disabled={reviewing}>
-                                <kbd>3</kbd> Easy
+                                <kbd>3</kbd> Easy (Master)
                             </button>
                         </div>
                     )}
