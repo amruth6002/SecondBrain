@@ -238,7 +238,7 @@ export default function App() {
 
         <div className="sidebar-footer">
           <p>Built for AI Unlocked 2026</p>
-          <p className="tech-stack">Azure AI · Phi-4 · Knowledge Agents</p>
+          <p className="tech-stack">Azure AI · GPT-4o · Knowledge Agents</p>
         </div>
       </aside>
 
